@@ -6,6 +6,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- 许可证由 PolyForm Noncommercial 1.0.0 切换为 **GNU GPL v3.0**（OSI 开源，允许商业使用；衍生作品须按 GPL 兼容方式开源）。历史发布版本（`v0.2.0` 及更早）仍按当时的 NC 许可授权，不追溯变更。
+
 ## [0.2.0] - 2026-11-05
 
 首个可公开就绪版本（source-available，非商业许可）。

@@ -41,5 +41,5 @@ body:
       options:
         - label: 该建议不涉及绕过学校/平台安全机制或违反第三方条款
           required: true
-        - label: 我理解本项目为非商业许可项目（PolyForm Noncommercial 1.0.0）
+        - label: 我理解本项目采用 GPL-3.0 开源许可（允许商业使用，衍生作品须按 GPL 兼容方式开源）
           required: true

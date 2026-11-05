@@ -25,5 +25,5 @@
 
 - 仅支持 Windows + MuMu 模拟器环境；
 - 依赖第三方 App（RunSimulation、健行校园）的 UI 与页面结构，App 更新可能导致流程失效；
-- 本项目为**非商业** source-available 许可，禁止商业用途；
+- 本项目采用 **GPL-3.0** 开源许可：允许商业使用，但衍生作品须按 GPL 兼容方式开源；
 - 依赖链包含 LGPL/AGPL 组件，二次分发前请阅读 `THIRD_PARTY_NOTICES.md`。

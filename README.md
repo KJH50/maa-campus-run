@@ -6,7 +6,7 @@
 **MaaCampusRun** 是一个 Windows 本地自动化工具：在 MuMu 模拟器中配合 RunSimulation 与「健行校园」完成校园跑流程，
 按距离/配速自动结束、结算，并支持每日定时执行（DSH / Windows 计划任务）。
 
-> 项目状态：`0.2.0` · source-available（原创代码采用非商业许可，见 [LICENSE](LICENSE) 与 [DISCLAIMER.md](DISCLAIMER.md)）
+> 项目状态：`0.2.0` · **GPL-3.0**（OSI 开源，允许商业使用；衍生作品须按 GPL 兼容方式开源，见 [LICENSE](LICENSE) 与 [DISCLAIMER.md](DISCLAIMER.md)）
 > 贡献与安全：[CONTRIBUTING.md](CONTRIBUTING.md) · [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) · [SECURITY.md](SECURITY.md)
 
 ## 正确流程（用户确认）
@@ -259,12 +259,13 @@ python tools\prepare_run.py            # 启动跑步模拟并打开健行校园
 
 ## 许可证说明
 
-本项目**原创代码**采用 **PolyForm Noncommercial License 1.0.0**（非商业许可，禁止商业用途），详见 [LICENSE](LICENSE)。
-该许可允许个人研究/学习/爱好、教育机构、政府机构等非商业使用，禁止商业目的使用或收费分发。
+本项目**原创代码**采用 **GNU General Public License v3.0**（GPL-3.0，OSI 认可的开源许可），详见 [LICENSE](LICENSE)。
 
-> 说明：PolyForm Noncommercial 1.0.0 **不是 OSI 认可的开源许可**；本项目按 source-available 方式公开，GitHub 可能将其识别为自定义许可证。
+- GPL-3.0 **允许商业使用**（包括收费分发），但衍生作品须以 GPL-3.0 兼容方式开源，并保留版权与许可声明；
+- 本仓库中的第三方组件仍按其各自许可证处理，本项目不会改变其授权；
+- 历史版本说明：`v0.2.0` 及更早的已发布版本当时采用 PolyForm Noncommercial 1.0.0，其授权不因本次切换而追溯变更；自本提交起的新版本按 GPL-3.0 授权。
 
-第三方组件保持其原有许可证，不受本项目非商业条款影响：
+第三方组件保持其原有许可证：
 
 - MaaFramework：**LGPL-3.0**，本项目通过 `MaaFw` PyPI 包动态使用其原生库，未修改其源码。
 - OCR 模型（`assets/resource/model/ocr`）：来自 MaaXYZ/MaaCommonAssets，**Apache-2.0**，随仓库分发并保留原许可（许可全文见同目录 `LICENSE-APACHE-2.0.txt`）；该模型本身仍可按 Apache-2.0 使用。
@@ -272,7 +273,7 @@ python tools\prepare_run.py            # 启动跑步模拟并打开健行校园
 
 逐项清单（含 MaaAgentBinary AGPL-3.0 传递依赖、numpy / Pillow / StrEnum 等）与合规提示见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 
-> 注意：若未来把 GPL/AGPL 代码并入本项目，需重新评估兼容性——GPL/AGPL 不允许在其代码上附加「禁止商业使用」的额外限制。
+> 注意：依赖链中的 AGPL-3.0 组件（MaaAgentBinary）与 GPL-3.0 的组合需按 AGPL 评估；详见 `THIRD_PARTY_NOTICES.md`。
 
 ## 免责声明
 

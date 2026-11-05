@@ -2,7 +2,7 @@
 
 感谢你愿意为 **MaaCampusRun**（校园跑值守）做出贡献。提交贡献前，请先阅读并同意 [LICENSE](LICENSE) 与 [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)。
 
-> 注意：本项目原创代码采用 **PolyForm Noncommercial License 1.0.0**（非商业），你提交的代码、文档与资源将按同一许可授权。
+> 注意：本项目原创代码采用 **GPL-3.0**（OSI 开源，允许商业使用；衍生作品须按 GPL 兼容方式开源），你提交的代码、文档与资源将按同一许可授权。
 
 ## 开发环境
 
@@ -55,7 +55,7 @@ python -m venv .venv
 ## 兼容性与边界
 
 - 不修改第三方组件（MaaFramework / MaaFw / OCR 模型）的许可证与版权声明；
-- 不引入 GPL/AGPL 代码到非商业许可项目中（详见 `THIRD_PARTY_NOTICES.md`）；
+- 引入 GPL/AGPL 代码前需评估与 GPL-3.0 的兼容性（GPL-3.0 兼容；AGPL-3.0 组合需按 AGPL 处理，详见 `THIRD_PARTY_NOTICES.md`）；
 - 不提交与“自动完成校园跑”无关的破坏性改动（如修改学校系统、绕过平台安全机制等）。
 
 ## 联系方式

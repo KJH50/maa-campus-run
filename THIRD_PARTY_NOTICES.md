@@ -1,7 +1,7 @@
 # 第三方组件与许可证声明（Third-Party Notices）
 
-本项目（**MaaCampusRun**，校园跑值守）的**原创代码**采用 **PolyForm Noncommercial License 1.0.0**（见仓库根目录 `LICENSE`）。
-以下第三方组件、依赖与资源分别遵循其各自许可证；本项目的非商业条款**不改变**、也不得被解释为改变这些第三方许可证的条款。
+本项目（**MaaCampusRun**，校园跑值守）的**原创代码**采用 **GNU General Public License v3.0**（GPL-3.0，见仓库根目录 `LICENSE`）。
+以下第三方组件、依赖与资源分别遵循其各自许可证；本项目的 GPL 授权**不改变**、也不得被解释为改变这些第三方许可证的条款。
 
 ## 1. 运行时依赖（通过 pip 安装，不随本仓库分发）
 
@@ -21,7 +21,7 @@
 |---|---|---|---|
 | PaddleOCR 中文 OCR 模型（`det.onnx` / `rec.onnx` / `keys.txt`） | `assets/resource/model/ocr/` | **Apache-2.0** | 来自 MaaXYZ/MaaCommonAssets（`OCR/ppocr_v5/zh_cn`）；许可全文见同目录 [`LICENSE-APACHE-2.0.txt`](assets/resource/model/ocr/LICENSE-APACHE-2.0.txt) |
 
-分发本仓库时，请保留上述模型的来源说明与 Apache-2.0 许可文本；不得将非商业限制附加到这些模型上。
+分发本仓库时，请保留上述模型的来源说明与 Apache-2.0 许可文本；不得将额外限制附加到这些模型上（应保留其 Apache-2.0 许可）。
 
 ## 3. 仅参考、未复制代码的项目
 
@@ -31,6 +31,7 @@
 
 ## 4. 合规提示
 
-1. 本项目原创代码的非商业限制**不适用于**上述第三方组件；第三方组件按其自身许可证使用、修改与分发。
-2. 依赖链中存在 **AGPL-3.0** 组件（`MaaAgentBinary`）。当前以 pip 依赖形式获取、未随仓库分发；若未来修改/分发该组件，或将 AGPL/GPL 代码并入本项目，需要按其许可证重新评估整体分发方式（AGPL/GPL 不允许附加「禁止商业使用」的额外限制）。
-3. 若你分发本仓库或其衍生版本，请同时保留 `LICENSE`（PolyForm Noncommercial 1.0.0）、`DISCLAIMER.md` 与本文件。
+1. 本项目原创代码的 GPL-3.0 授权**不适用于**上述第三方组件；第三方组件按其自身许可证使用、修改与分发。
+2. 依赖链中存在 **AGPL-3.0** 组件（`MaaAgentBinary`）。当前以 pip 依赖形式获取、未随仓库分发；GPLv3 与 AGPLv3 可组合，但若分发包含该组件的组合包或修改该组件，需按 AGPL-3.0 处理（含网络使用条款）。
+3. 若你分发本仓库或其衍生版本，请同时保留 `LICENSE`（GPL-3.0）、`DISCLAIMER.md` 与本文件；衍生作品须按 GPL-3.0 兼容方式开源。
+4. 历史版本：`v0.2.0` 及更早的已发布版本当时采用 PolyForm Noncommercial 1.0.0，不因本次切换而追溯变更。
