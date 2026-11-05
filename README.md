@@ -201,7 +201,13 @@ python tools\prepare_run.py            # 启动跑步模拟并打开健行校园
 
 ## 许可证说明
 
+本项目**原创代码**采用 **PolyForm Noncommercial License 1.0.0**（非商业许可，禁止商业用途），详见 [LICENSE](LICENSE)。
+该许可允许个人研究/学习/爱好、教育机构、政府机构等非商业使用，禁止商业目的使用或收费分发。
+
+第三方组件保持其原有许可证，不受本项目非商业条款影响：
+
 - MaaFramework：**LGPL-3.0**，本项目通过 `MaaFw` PyPI 包动态使用其原生库，未修改其源码。
+- OCR 模型（`assets/resource/model/ocr`）：来自 MaaXYZ/MaaCommonAssets，**Apache-2.0**，随仓库分发并保留原许可；该模型本身仍可按 Apache-2.0 使用。
 - MaaEnd：**AGPL-3.0**，本项目仅参考其工程结构与协议用法，**未复制其代码或资源**。
-- OCR 模型来自 MaaXYZ/MaaCommonAssets（Apache-2.0），随资源目录分发。
-- 本项目自身许可证尚未指定（需维护者确认后再添加 LICENSE）。
+
+> 注意：若未来把 GPL/AGPL 代码并入本项目，需重新评估兼容性——GPL/AGPL 不允许在其代码上附加「禁止商业使用」的额外限制。
