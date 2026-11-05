@@ -3,6 +3,12 @@
 参考 [MaaEnd](https://github.com/MaaEnd/MaaEnd) 的工程结构，用 [MaaFramework](https://github.com/MaaXYZ/MaaFramework)
 （Python 绑定 `MaaFw`）实现校园跑自动值守。
 
+**MaaCampusRun** 是一个 Windows 本地自动化工具：在 MuMu 模拟器中配合 RunSimulation 与「健行校园」完成校园跑流程，
+按距离/配速自动结束、结算，并支持每日定时执行（DSH / Windows 计划任务）。
+
+> 项目状态：`0.2.0` · source-available（原创代码采用非商业许可，见 [LICENSE](LICENSE) 与 [DISCLAIMER.md](DISCLAIMER.md)）
+> 贡献与安全：[CONTRIBUTING.md](CONTRIBUTING.md) · [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) · [SECURITY.md](SECURITY.md)
+
 ## 正确流程（用户确认）
 
 1. 先把两个 App 都开到最终界面：
@@ -67,7 +73,7 @@ maa-campus-run/
 - Python 3.12（`MaaFw==5.15.0` 自带 MaaFramework 原生库与 OCR 引擎）
 
 ```powershell
-cd E:\文件\工作\momo\maa-campus-run
+cd maa-campus-run
 python -m venv .venv
 .venv\Scripts\pip install -r requirements.txt
 ```
@@ -199,16 +205,71 @@ python tools\prepare_run.py            # 启动跑步模拟并打开健行校园
 | `agent/` 自定义 Go/C++ 扩展 | 无需 Agent：用 Python `CustomController` 适配 MuMu 多屏 |
 | 标准 `Adb` 控制器 | 自定义控制器（MuMu 会把 App 放到独立虚拟屏，标准 ADB 截图只能抓 display 0） |
 
+## 示例输出（脱敏）
+
+以下为一次成功运行的日志片段（示例数据；实际距离/配速因每次随机结束点而略有不同）：
+
+```text
+2026-11-05 07:00:36 [INFO] ===== 开始执行（完整流程）=====
+2026-11-05 07:00:37 [INFO] 准备 RunSimulation（路线：标准）...
+2026-11-05 07:00:43 [INFO] 证据截图：...\run_prepared.png（1080x1920）
+2026-11-05 07:00:43 [INFO] 准备健行校园（首页 → 继续征程）...
+2026-11-05 07:01:57 [INFO] 已进入校园跑页（第 2 次检查）
+2026-11-05 07:02:00 [INFO] 点击 RunSimulation 的「开始跑步」...
+2026-11-05 07:02:18 [INFO] 点击健行校园的「开始」...
+2026-11-05 07:02:22 [INFO] 开跑前置校验通过：RunSimulation 正在跑步、健行校园正在记录
+2026-11-05 07:14:22 [INFO] 已等待 12/12 分钟
+2026-11-05 07:14:24 [INFO] 当前距离：1.66 km，总时间：12:07，平均配速：7.28 分/公里
+...
+2026-11-05 07:16:55 [INFO] 当前距离：2.01 km，总时间：14:38，平均配速：7.27 分/公里
+2026-11-05 07:16:55 [INFO] 结束跑步并等待结算 ...
+2026-11-05 07:17:04 [INFO] 结束与结算流程已完成
+2026-11-05 07:17:08 [INFO] 停止与关闭：完成
+2026-11-05 07:17:08 [INFO] 全部完成：距离 2.01 km，配速 7.27 分/公里，已结束并关闭
+```
+
+## 常见问题（FAQ）
+
+**Q：MuMu 没开，脚本会自动启动吗？**
+会。`run.py` 的 `ensure_emulator` 在连接失败时按 `config.mumu_manager` / `mumu_index` 调 `MuMuManager control -v <idx> launch`，最多等待 180 秒连接。
+
+**Q：`--dry` 会点击按钮或上传记录吗？**
+不会。`--dry` 只截图并识别一次距离/配速，不点击任何按钮、不开始/结束跑步、不上传。
+
+**Q：跑完会自动关闭 MuMu 吗？**
+成功跑完并关闭两个 App 后会关闭模拟器（`shutdown_emulator`，默认 `true`）；下次运行会自动重新拉起。失败时不关闭，便于排查（可在 `config.json` 中设为 `false` 保留）。
+
+**Q：日志和截图在哪里？保留多久？**
+`logs/run_YYYYMMDD.log`、`logs/shots/`；`log_retention_days`（默认 14 天）会在启动时清理过旧文件；一键入口摘要见 `logs/oneclick/`。
+
+**Q：如何调整目标距离/配速？**
+修改 `config.json` 的 `target_distance_km`、`min_pace_minutes`、`max_pace_minutes`；结束距离会在整圈闭合点附近随机，保证大于目标。
+
+**Q：失败时怎么看原因？**
+按退出码：`1` 连接/初始化失败；`2` 等待超时/开跑未记录/强制结束未达标；`3` 开始·结束·关闭失败；`5` 已有实例在运行。查看 `logs/run_*.log` 与 `logs/shots/` 对应阶段截图。
+
+## 贡献与反馈
+
+- 贡献流程与开发环境：[CONTRIBUTING.md](CONTRIBUTING.md)
+- 行为准则：[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
+- 安全漏洞（请勿公开 Issue）：[SECURITY.md](SECURITY.md)
+- 第三方组件许可证：[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
+- 免责声明：[DISCLAIMER.md](DISCLAIMER.md)
+
 ## 许可证说明
 
 本项目**原创代码**采用 **PolyForm Noncommercial License 1.0.0**（非商业许可，禁止商业用途），详见 [LICENSE](LICENSE)。
 该许可允许个人研究/学习/爱好、教育机构、政府机构等非商业使用，禁止商业目的使用或收费分发。
 
+> 说明：PolyForm Noncommercial 1.0.0 **不是 OSI 认可的开源许可**；本项目按 source-available 方式公开，GitHub 可能将其识别为自定义许可证。
+
 第三方组件保持其原有许可证，不受本项目非商业条款影响：
 
 - MaaFramework：**LGPL-3.0**，本项目通过 `MaaFw` PyPI 包动态使用其原生库，未修改其源码。
-- OCR 模型（`assets/resource/model/ocr`）：来自 MaaXYZ/MaaCommonAssets，**Apache-2.0**，随仓库分发并保留原许可；该模型本身仍可按 Apache-2.0 使用。
+- OCR 模型（`assets/resource/model/ocr`）：来自 MaaXYZ/MaaCommonAssets，**Apache-2.0**，随仓库分发并保留原许可（许可全文见同目录 `LICENSE-APACHE-2.0.txt`）；该模型本身仍可按 Apache-2.0 使用。
 - MaaEnd：**AGPL-3.0**，本项目仅参考其工程结构与协议用法，**未复制其代码或资源**。
+
+逐项清单（含 MaaAgentBinary AGPL-3.0 传递依赖、numpy / Pillow / StrEnum 等）与合规提示见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 
 > 注意：若未来把 GPL/AGPL 代码并入本项目，需重新评估兼容性——GPL/AGPL 不允许在其代码上附加「禁止商业使用」的额外限制。
 
