@@ -25,7 +25,7 @@
 
 ## 检查清单
 
-- [ ] 已阅读并同意 [LICENSE](../LICENSE) 与 [CODE_OF_CONDUCT.md](../CODE_OF_CONDUCT.md)
+- [ ] 已阅读并同意 [LICENSE](../LICENSE)
 - [ ] 未提交 `config.json`、`logs/`、`.venv/`、账号/密码/证书/Token
 - [ ] 新功能附带离线测试；行为变更已更新 `CHANGELOG.md`
 - [ ] 未修改第三方组件的许可证/版权声明，未引入 GPL/AGPL 代码

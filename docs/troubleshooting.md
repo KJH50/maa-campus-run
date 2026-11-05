@@ -40,5 +40,3 @@
 - `logs/shots/` 对应阶段截图（不要包含账号/个人隐私）；
 - 环境：Windows 版本、Python 版本、MuMu 版本/实例、`adb_serial`；
 - 复现步骤与是否可稳定复现。
-
-> 安全漏洞请勿公开提交，见 [SECURITY.md](../SECURITY.md)。

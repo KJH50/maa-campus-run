@@ -3,15 +3,17 @@
 **适用项目**：MaaCampusRun（校园跑值守）
 **适用年份**：2026
 
-> 说明：上文"项目名称"与"年份"为占位信息；若复用本文件，请替换为实际项目名称与年份。本文件使用中文撰写，英文仅为辅助说明，如有歧义以中文为准。
+> 说明：上文"项目名称"与"年份"为占位信息；若复用本文件，请替换为实际项目名称与年份。
 
 ## 1. 按「现状」提供（AS IS）
 
 本项目及其源代码、文档、脚本、配置示例和随附资源，均按「现状」（"AS IS"）和「现有」（"AS AVAILABLE"）提供，不附带任何形式的明示或暗示担保，包括但不限于对适销性、特定用途适用性、不侵权、准确性、完整性、无错误、不中断、无病毒或其它缺陷的担保。作者/维护者未就本项目作出任何明示或暗示的承诺或保证。
 
-## 2. 使用风险由使用者自行承担
+## 2. 用户行为与后果由用户自行承担
 
-使用者应自行评估并承担使用、修改、复制、分发本项目及相关内容的全部风险，包括但不限于：
+**使用者使用本脚本所进行的一切操作及其后果，由使用者自行承担全部责任。** 包括但不限于：运行、修改、复制、分发本脚本，以及因误用、配置错误、操作不当、脚本缺陷、OCR 误判、第三方 App/服务异常等原因直接或间接产生的一切行为与结果。
+
+具体包括但不限于：
 
 - 设备、模拟器、操作系统、网络环境、账号与数据的风险；
 - 第三方应用、平台或服务的服务条款、使用规则与封禁风险；
@@ -22,7 +24,7 @@
 
 ## 3. 责任限制
 
-在适用法律允许的最大范围内，本项目作者、维护者及贡献者不对因使用或无法使用本项目（包括其代码、文档、脚本、资源或任何衍生内容）而产生的任何直接、间接、附带、特殊、惩罚性或后果性损失承担责任，无论其是否已被告知该等损失的可能性。前述损失包括但不限于：数据丢失或损坏、设备/模拟器损坏、账号封禁或限制、跑步记录无效或被撤销、学业成绩或评价受影响、第三方索赔、利润损失或业务中断。
+在适用法律允许的最大范围内，本项目作者、维护者及贡献者**不对因使用或无法使用本项目（包括其代码、文档、脚本、资源或任何衍生内容）产生的任何直接、间接、附带、特殊、惩罚性或后果性损失承担责任**，无论其是否已被告知该等损失的可能性。前述损失包括但不限于：数据丢失或损坏、设备/模拟器损坏、账号封禁或限制、跑步记录无效或被撤销、学业成绩或评价受影响、第三方索赔、利润损失或业务中断。
 
 ## 4. 第三方内容与依赖
 
@@ -38,4 +40,4 @@
 
 ---
 
-*If you are an English reader: this project is provided "AS IS", without warranty of any kind, express or implied. You are solely responsible for any risks arising from its use. The authors and maintainers shall not be liable for any direct or indirect damages. Third-party components remain under their respective licenses and terms. Nothing herein constitutes legal or other professional advice.*
+*If you are an English reader: this project is provided "AS IS", without warranty of any kind. You are solely responsible for your actions and their consequences when using this script. The authors and maintainers accept no responsibility or liability for any direct or indirect damages arising from its use. Third-party components remain under their respective licenses and terms. Nothing herein constitutes legal or other professional advice.*

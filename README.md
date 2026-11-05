@@ -7,7 +7,6 @@
 按距离/配速自动结束、结算，并支持每日定时执行（DSH / Windows 计划任务）。
 
 > 项目状态：`0.2.1` · **GPL-3.0**（OSI 开源，允许商业使用；衍生作品须按 GPL 兼容方式开源，见 [LICENSE](LICENSE) 与 [DISCLAIMER.md](DISCLAIMER.md)）
-> 贡献与安全：[CONTRIBUTING.md](CONTRIBUTING.md) · [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) · [SECURITY.md](SECURITY.md)
 
 ## 正确流程（用户确认）
 
@@ -252,11 +251,9 @@ python tools\prepare_run.py            # 启动跑步模拟并打开健行校园
 
 - [文档索引](docs/README.md)：架构与执行流程、配置说明、退出码与失败处理、FAQ、故障排查
 
-## 贡献与反馈
+## 反馈与免责声明
 
-- 贡献流程与开发环境：[CONTRIBUTING.md](CONTRIBUTING.md)
-- 行为准则：[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
-- 安全漏洞（请勿公开 Issue）：[SECURITY.md](SECURITY.md)
+- 反馈：通过 GitHub Issues 提交（请勿包含账号、密码等敏感信息）
 - 第三方组件许可证：[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
 - 变更日志：[CHANGELOG.md](CHANGELOG.md)
 - 免责声明：[DISCLAIMER.md](DISCLAIMER.md)
