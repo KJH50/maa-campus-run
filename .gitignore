@@ -1,0 +1,12 @@
+# Python / 虚拟环境
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# 运行产物（日志、截图、结果摘要）
+logs/
+*.log
+
+# 本机配置（含绝对路径）；使用 config.example.json 初始化
+config.json

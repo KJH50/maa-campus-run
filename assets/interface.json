@@ -1,0 +1,39 @@
+{
+    "interface_version": 2,
+    "name": "MaaCampusRun",
+    "version": "v0.2.0",
+    "description": "MaaCampusRun · 校园跑值守（MaaFramework 版）：打开 RunSimulation 跑步模拟与健行校园，按距离/配速结束后停止模拟并关闭应用。",
+    "controller": [
+        {
+            "name": "MuMu ADB",
+            "label": "MuMu 模拟器（ADB）",
+            "description": "注意：本项目实际通过内置 CustomController 适配 MuMu 多虚拟屏，本条目仅为接口示例；用通用 UI 加载时需自行接入 CustomController。",
+            "type": "Adb",
+            "adb": {}
+        }
+    ],
+    "resource": [
+        {
+            "name": "default",
+            "label": "默认资源",
+            "path": ["./resource"]
+        }
+    ],
+    "task": [
+        {
+            "name": "准备跑步界面",
+            "entry": "RunPrepare",
+            "description": "打开 RunSimulation，必要时切换路线为「标准」，停在准备跑步页。"
+        },
+        {
+            "name": "开始跑步",
+            "entry": "RunStart",
+            "description": "点击 RunSimulation 的「开始跑步」。"
+        },
+        {
+            "name": "结束并关闭",
+            "entry": "CampusRunStop",
+            "description": "点击「全部停止」，然后关闭健行校园与 RunSimulation。"
+        }
+    ]
+}

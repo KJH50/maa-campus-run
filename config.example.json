@@ -1,0 +1,35 @@
+{
+    "adb_path": "C:\\path\\to\\adb.exe",
+    "adb_serial": "127.0.0.1:16416",
+    "mumu_manager": "C:\\Program Files\\Netease\\MuMu\\nx_main\\MuMuManager.exe",
+    "mumu_index": 1,
+    "start_time": "07:00",
+    "max_wait_minutes": 120,
+    "poll_seconds": 8,
+    "target_distance_km": 2.0,
+    "check_after_minutes": 12,
+    "max_run_minutes": 20,
+    "max_pace_minutes": 10.0,
+    "min_pace_minutes": 3.0,
+    "distance_regex": "^\\d+\\.\\d{2}$",
+    "route_text": "标准",
+    "close_apps": true,
+    "shutdown_emulator": true,
+    "log_dir": "logs",
+    "log_retention_days": 14,
+    "pre_click_texts": [],
+    "campus": {
+        "package": "yx.c520.xyz",
+        "activity": "yx.c520.xyz/.MainActivity"
+    },
+    "run": {
+        "package": "local.runsimulation.publicapp",
+        "activity": "local.runsimulation.publicapp/.MainActivity"
+    },
+    "alerts": {
+        "enabled": false,
+        "type": "generic",
+        "webhook_url": "",
+        "on": ["connect_failed", "start_failed", "timeout", "stop_failed", "exception"]
+    }
+}

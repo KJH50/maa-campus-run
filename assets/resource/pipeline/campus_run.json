@@ -1,0 +1,252 @@
+{
+    "RunPrepare": {
+        "action": "StartApp",
+        "package": "local.runsimulation.publicapp/.MainActivity",
+        "next": [
+            "CheckStandard"
+        ],
+        "timeout": 12000,
+        "on_error": [
+            "RunPrepared"
+        ]
+    },
+    "CheckStandard": {
+        "recognition": "OCR",
+        "expected": "^标准$",
+        "action": "DoNothing",
+        "next": [
+            "RunPrepared"
+        ],
+        "on_error": [
+            "TapRouteMode"
+        ],
+        "timeout": 5000
+    },
+    "TapRouteMode": {
+        "recognition": "OCR",
+        "expected": "路线模式",
+        "action": "Click",
+        "next": [
+            "CheckStandardAgain"
+        ],
+        "timeout": 5000
+    },
+    "CheckStandardAgain": {
+        "recognition": "OCR",
+        "expected": "^标准$",
+        "action": "DoNothing",
+        "next": [
+            "RunPrepared"
+        ],
+        "on_error": [
+            "TapRouteLibrary"
+        ],
+        "timeout": 5000
+    },
+    "TapRouteLibrary": {
+        "recognition": "OCR",
+        "expected": "路线库",
+        "action": "Click",
+        "next": [
+            "PickStandard"
+        ],
+        "on_error": [
+            "RunPrepared"
+        ],
+        "timeout": 5000
+    },
+    "PickStandard": {
+        "recognition": "OCR",
+        "expected": "^标准$",
+        "action": "Click",
+        "next": [
+            "BackToRun"
+        ],
+        "on_error": [
+            "RunPrepared"
+        ],
+        "timeout": 5000
+    },
+    "BackToRun": {
+        "action": "ClickKey",
+        "key": 4,
+        "next": [
+            "RunPrepared"
+        ]
+    },
+    "RunPrepared": {
+        "action": "DoNothing"
+    },
+    "RunStart": {
+        "next": [
+            "TapStartRun"
+        ],
+        "timeout": 10000,
+        "on_error": [
+            "RunStartDone"
+        ]
+    },
+    "TapStartRun": {
+        "recognition": "OCR",
+        "expected": [
+            "^开始跑步$",
+            "^点击跑步$",
+            "^开始$"
+        ],
+        "action": "Click",
+        "next": [
+            "RunStartDone"
+        ],
+        "timeout": 10000
+    },
+    "RunStartDone": {
+        "action": "DoNothing"
+    },
+    "CampusBegin": {
+        "next": [
+            "CheckAlreadyRunning"
+        ],
+        "timeout": 8000,
+        "on_error": [
+            "TapCampusStart"
+        ]
+    },
+    "CheckAlreadyRunning": {
+        "recognition": "OCR",
+        "expected": "点击结束跑步",
+        "action": "DoNothing",
+        "next": [
+            "CampusBeginDone"
+        ],
+        "on_error": [
+            "TapCampusStart"
+        ],
+        "timeout": 5000
+    },
+    "TapCampusStart": {
+        "recognition": "OCR",
+        "expected": [
+            "^开始$",
+            "^点击跑步$"
+        ],
+        "action": "Click",
+        "next": [
+            "CampusBegan"
+        ],
+        "timeout": 10000
+    },
+    "CampusBegan": {
+        "recognition": "OCR",
+        "expected": "点击结束跑步",
+        "action": "DoNothing",
+        "next": [
+            "CampusBeginDone"
+        ],
+        "timeout": 10000
+    },
+    "CampusBeginDone": {
+        "action": "DoNothing"
+    },
+    "ReadStats": {
+        "recognition": "OCR",
+        "expected": ".+",
+        "action": "DoNothing"
+    },
+    "CampusRunFinish": {
+        "next": [
+            "ClickEnd"
+        ],
+        "timeout": 10000
+    },
+    "ClickEnd": {
+        "recognition": "OCR",
+        "expected": "^结束$",
+        "action": "Click",
+        "next": [
+            "ConfirmEndDialog"
+        ],
+        "timeout": 8000
+    },
+    "ConfirmEndDialog": {
+        "recognition": "OCR",
+        "expected": "确定结束本次跑步吗",
+        "action": "DoNothing",
+        "next": [
+            "ClickConfirmEnd"
+        ],
+        "timeout": 8000
+    },
+    "ClickConfirmEnd": {
+        "recognition": "OCR",
+        "expected": "^确定结束$",
+        "action": "Click",
+        "next": [
+            "WaitSettle"
+        ],
+        "timeout": 8000
+    },
+    "WaitSettle": {
+        "recognition": "OCR",
+        "expected": [
+            "上传成功",
+            "提交成功",
+            "已上传",
+            "结算成功",
+            "保存成功",
+            "上传完成",
+            "提交完成",
+            "本次跑步已完成",
+            "我的数据"
+        ],
+        "action": "DoNothing",
+        "next": [
+            "SettleDone"
+        ],
+        "timeout": 30000
+    },
+    "SettleDone": {
+        "action": "DoNothing"
+    },
+    "CampusRunStop": {
+        "action": "StartApp",
+        "package": "local.runsimulation.publicapp/.MainActivity",
+        "next": [
+            "ClickStop"
+        ],
+        "on_error": [
+            "CloseCampus"
+        ],
+        "timeout": 10000
+    },
+    "ClickStop": {
+        "recognition": "OCR",
+        "expected": "全部停止",
+        "action": "Click",
+        "next": [
+            "CloseCampus"
+        ],
+        "timeout": 8000
+    },
+    "CloseCampus": {
+        "action": "StopApp",
+        "package": "yx.c520.xyz",
+        "next": [
+            "CloseRunApp"
+        ]
+    },
+    "CloseRunApp": {
+        "action": "StopApp",
+        "package": "local.runsimulation.publicapp"
+    },
+    "Probe": {
+        "recognition": "OCR",
+        "expected": ".*",
+        "action": "DoNothing"
+    },
+    "TapText": {
+        "recognition": "OCR",
+        "expected": ".*",
+        "action": "Click",
+        "timeout": 5000
+    }
+}

@@ -1,0 +1,3 @@
+MaaFw==5.15.0
+pillow>=10.0
+numpy>=1.24
