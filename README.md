@@ -3,7 +3,7 @@
 参考 [MaaEnd](https://github.com/MaaEnd/MaaEnd) 的工程结构，用 [MaaFramework](https://github.com/MaaXYZ/MaaFramework)
 （Python 绑定 `MaaFw`）实现校园跑自动值守。
 
-**MaaCampusRun** 是一个 Windows 本地自动化工具：在 MuMu 模拟器中配合 RunSimulation 与「健行校园」完成校园跑流程，
+**MaaCampusRun** 是一个 Windows 本地自动化工具：在 MuMu 模拟器中配合跑步软件与「健行校园」完成校园跑流程，
 按距离/配速自动结束、结算，并支持每日定时执行（DSH / Windows 计划任务）。
 
 > 项目状态：`0.2.1` · **GPL-3.0**（OSI 开源，允许商业使用；衍生作品须按 GPL 兼容方式开源，见 [LICENSE](LICENSE) 与 [DISCLAIMER.md](DISCLAIMER.md)）
