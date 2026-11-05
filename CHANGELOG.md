@@ -6,9 +6,19 @@
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-11-05
+
+GPL-3.0 许可版本 + 文档扩展（公开前准备）。
+
 ### Changed
 
 - 许可证由 PolyForm Noncommercial 1.0.0 切换为 **GNU GPL v3.0**（OSI 开源，允许商业使用；衍生作品须按 GPL 兼容方式开源）。历史发布版本（`v0.2.0` 及更早）仍按当时的 NC 许可授权，不追溯变更。
+- `LICENSE` 改为纯 GNU GPL-3.0 全文；版权声明（`Copyright (C) 2026 KJH50`）移入 `NOTICE`，以适配 GitHub 许可证识别。
+- 版本号升至 `0.2.1`。
+
+### Added
+
+- `docs/` 文档：架构与执行流程、配置说明、退出码与失败处理、FAQ、故障排查（入口见 `docs/README.md`）。
 
 ## [0.2.0] - 2026-11-05
 

@@ -6,7 +6,7 @@
 **MaaCampusRun** 是一个 Windows 本地自动化工具：在 MuMu 模拟器中配合 RunSimulation 与「健行校园」完成校园跑流程，
 按距离/配速自动结束、结算，并支持每日定时执行（DSH / Windows 计划任务）。
 
-> 项目状态：`0.2.0` · **GPL-3.0**（OSI 开源，允许商业使用；衍生作品须按 GPL 兼容方式开源，见 [LICENSE](LICENSE) 与 [DISCLAIMER.md](DISCLAIMER.md)）
+> 项目状态：`0.2.1` · **GPL-3.0**（OSI 开源，允许商业使用；衍生作品须按 GPL 兼容方式开源，见 [LICENSE](LICENSE) 与 [DISCLAIMER.md](DISCLAIMER.md)）
 > 贡献与安全：[CONTRIBUTING.md](CONTRIBUTING.md) · [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) · [SECURITY.md](SECURITY.md)
 
 ## 正确流程（用户确认）
@@ -247,6 +247,10 @@ python tools\prepare_run.py            # 启动跑步模拟并打开健行校园
 
 **Q：失败时怎么看原因？**
 按退出码：`1` 连接/初始化失败；`2` 等待超时/开跑未记录/强制结束未达标；`3` 开始·结束·关闭失败；`5` 已有实例在运行。查看 `logs/run_*.log` 与 `logs/shots/` 对应阶段截图。
+
+## 文档
+
+- [文档索引](docs/README.md)：架构与执行流程、配置说明、退出码与失败处理、FAQ、故障排查
 
 ## 贡献与反馈
 
