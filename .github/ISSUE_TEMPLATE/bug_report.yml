@@ -1,0 +1,76 @@
+name: Bug 报告
+description: 报告一个可复现的问题（请勿填写真实账号、密码、证书或 Token）
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢反馈！请先确认已阅读 README 与 SECURITY.md；**安全问题请勿在此公开报告**，请使用 Security → Report a vulnerability。
+  - type: input
+    id: version
+    attributes:
+      label: 版本 / 提交
+      description: pyproject.toml 中的版本或 git 提交哈希
+      placeholder: "0.2.0 / ddb07c6"
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: 运行方式
+      options:
+        - run.py --now（正式）
+        - run.py --now --dry（演练）
+        - scripts\一键值守.cmd
+        - 其他
+    validations:
+      required: true
+  - type: textarea
+    id: env
+    attributes:
+      label: 环境
+      description: Windows 版本、Python 版本、MuMu 版本/实例、adb 地址、RunSimulation/健行校园 版本
+      placeholder: |
+        Windows: 11 23H2
+        Python: 3.12.14
+        MuMu: vX (实例 1, adb 127.0.0.1:16416)
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      placeholder: |
+        1. ...
+        2. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期望结果
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: 实际结果
+      description: 请附退出码与关键日志（脱敏后）
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: 日志 / 截图（可选，务必脱敏）
+      description: 可粘贴 logs 中相关行；不要上传含个人信息的完整截图
+      render: text
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: 确认
+      options:
+        - label: 我已阅读 README 与 DISCLAIMER，并确认内容已脱敏（无账号/密码/证书/Token）
+          required: true
+        - label: 该问题不是安全漏洞（安全漏洞请走私密渠道）
+          required: true
