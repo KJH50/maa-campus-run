@@ -254,6 +254,7 @@ python tools\prepare_run.py            # 启动跑步模拟并打开健行校园
 - 行为准则：[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
 - 安全漏洞（请勿公开 Issue）：[SECURITY.md](SECURITY.md)
 - 第三方组件许可证：[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
+- 变更日志：[CHANGELOG.md](CHANGELOG.md)
 - 免责声明：[DISCLAIMER.md](DISCLAIMER.md)
 
 ## 许可证说明
