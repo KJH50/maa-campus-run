@@ -259,7 +259,7 @@ python tools\prepare_run.py            # 启动跑步模拟并打开健行校园
 
 ## 许可证说明
 
-本项目**原创代码**采用 **GNU General Public License v3.0**（GPL-3.0，OSI 认可的开源许可），详见 [LICENSE](LICENSE)。
+本项目**原创代码**采用 **GNU General Public License v3.0**（GPL-3.0，OSI 认可的开源许可），详见 [LICENSE](LICENSE)；版权声明（`Copyright (C) 2026 KJH50`）见 [NOTICE](NOTICE)。
 
 - GPL-3.0 **允许商业使用**（包括收费分发），但衍生作品须以 GPL-3.0 兼容方式开源，并保留版权与许可声明；
 - 本仓库中的第三方组件仍按其各自许可证处理，本项目不会改变其授权；
