@@ -14,6 +14,8 @@
 | `emulator_restart_on_fail` | bool | 否 | 启动超时后是否重启实例一次再重试（默认 `true`） |
 | `instances` | array | 否 | 多模拟器并行配置；≥2 项时自动并行（每项 `{name, adb_serial, mumu_index}`），为空则单实例 |
 | `start_time` | "HH:MM" | 否 | `run.py` 常驻等待/Windows 计划任务使用的执行时间（默认 `07:00`） |
+| `run_window` | object | 否 | 每日时间区间内随机执行：`{"start":"07:00","end":"08:30"}`；设置后 `run.py`（不带 `--now`）在区间内随机取时间，详见「定时调度」 |
+| `run_windows` | array | 否 | 一天多个时间段（如 06:30-07:30、12:00-13:00、09:00-10:00）；每个时间段各执行一次，与 `run_window` 互斥 |
 | `target_distance_km` | float | 否 | 基础目标距离（默认 `2.0`） |
 | `min_pace_minutes` / `max_pace_minutes` | float | 否 | 允许的平均配速区间（默认 3~10 分/公里） |
 | `check_after_minutes` | int | 否 | 开跑后先等待多久再检查（默认 12 分钟） |
@@ -58,6 +60,30 @@
 | `finish_distance_max_km` | `2.2` | 结束距离上限 |
 
 > 修改 `target_distance_km` / 配速区间前请确认学校要求；`config.json` 不参与版本控制，切勿提交。
+
+## 定时调度（可选）
+
+- `start_time`：固定每天执行时间（默认 `07:00`），`run.py` 不带 `--now` 时使用；
+- `run_window`：设置后改为「每日区间内随机时间」：
+  - 区间内随机取一个分钟级时间，写入 `logs/.next_run`；当天重启复用，不会重新随机；
+  - 若当天随机时间已过但仍在区间内，立即执行；若已过整个区间，则顺延到次日的随机时间；
+  - `--at HH:MM` 可强制固定时间，`--now` 立即执行并忽略 `run_window`；
+- `run_windows`：一天多个时间段（数组），每个时间段各执行一次（各自区间内随机时间）：
+  - 时间段不能重叠，且与 `run_window` 互斥；
+  - 随机时间与完成状态保存在 `logs/.run_windows_state.json`，当天重启跳过已完成时间段；
+  - 多时间段模式会产生多条跑步记录，`skip_if_success_today` 不阻止后续时间段；
+- 示例（也是默认模板配置）：
+
+```json
+"run_windows": [
+  {"start": "06:30", "end": "07:30"},
+  {"start": "12:00", "end": "13:00"},
+  {"start": "09:00", "end": "10:00"}
+]
+```
+
+  > 运行时按时间先后排序执行：06:30-07:30 → 09:00-10:00 → 12:00-13:00。
+- Windows 计划任务：`scripts\install_task.ps1` 检测到 `run_window`/`run_windows` 会在**第一个时间段起点**启动 `run.py`（不带 `--now`），由脚本等待随机时间；未配置时仍运行一键入口。
 
 ## 多实例并行（可选）
 

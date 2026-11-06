@@ -6,6 +6,8 @@ import json
 import re
 from pathlib import Path
 
+from .schedule import all_windows, parse_hhmm, window_bounds
+
 DEFAULTS: dict = {
     "adb_path": "",
     "adb_serial": "127.0.0.1:16416",
@@ -15,6 +17,8 @@ DEFAULTS: dict = {
     "emulator_boot_timeout_seconds": 300,
     "emulator_restart_on_fail": True,
     "start_time": "07:00",
+    "run_window": None,
+    "run_windows": [],
     "max_wait_minutes": 120,
     "poll_seconds": 8,
     "target_distance_km": 2.0,
@@ -79,6 +83,20 @@ def validate_config(cfg: dict) -> None:
         re.compile(cfg.get("distance_regex") or DEFAULTS["distance_regex"])
     except re.error as e:
         raise ValueError(f"distance_regex 不是合法正则：{e}") from e
+    try:
+        parse_hhmm(cfg.get("start_time") or DEFAULTS["start_time"])
+    except ValueError as e:
+        raise ValueError(f"start_time 配置错误：{e}") from e
+    try:
+        window_bounds(cfg)
+    except ValueError as e:
+        raise ValueError(f"run_window 配置错误：{e}") from e
+    try:
+        all_windows(cfg)
+    except ValueError as e:
+        raise ValueError(f"run_windows 配置错误：{e}") from e
+    if cfg.get("run_window") and cfg.get("run_windows"):
+        raise ValueError("run_window 与 run_windows 只能设置一个")
     if cfg.get("target_distance_km") is not None and float(cfg["target_distance_km"]) <= 0:
         raise ValueError("target_distance_km 必须大于 0")
     instances = cfg.get("instances") or []

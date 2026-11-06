@@ -7,6 +7,21 @@
     "emulator_boot_timeout_seconds": 300,
     "emulator_restart_on_fail": true,
     "start_time": "07:00",
+    "run_window": null,
+    "run_windows": [
+        {
+            "start": "06:30",
+            "end": "07:30"
+        },
+        {
+            "start": "12:00",
+            "end": "13:00"
+        },
+        {
+            "start": "09:00",
+            "end": "10:00"
+        }
+    ],
     "max_wait_minutes": 120,
     "poll_seconds": 8,
     "target_distance_km": 2.0,
@@ -34,6 +49,13 @@
         "enabled": false,
         "type": "generic",
         "webhook_url": "",
-        "on": ["connect_failed", "start_failed", "timeout", "stop_failed", "exception", "progress_anomaly"]
+        "on": [
+            "connect_failed",
+            "start_failed",
+            "timeout",
+            "stop_failed",
+            "exception",
+            "progress_anomaly"
+        ]
     }
 }

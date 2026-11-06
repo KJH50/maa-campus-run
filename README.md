@@ -91,6 +91,8 @@ python -m venv .venv
 | `instances` | 多模拟器并行配置（数组，≥2 项时自动并行）；每项 `{name, adb_serial, mumu_index}`，为空则单实例运行 |
 | `emulator_boot_timeout_seconds` / `emulator_restart_on_fail` | 冷启动等待上限（秒，默认 `300`）；超时后是否重启实例一次再重试（默认 `true`） |
 | `start_time` | 每天几点执行，默认 `07:00`（`run.py` 自身定时与 Windows 计划任务使用） |
+| `run_window` | 可选：每日时间区间内随机执行，如 `{"start":"07:00","end":"08:30"}`；设置后 `run.py`（不带 `--now`）会在区间内随机取一个时间，详见下方「定时方式」 |
+| `run_windows` | 可选：一天多个时间段，如 `[{...},{...}]`；每个时间段各执行一次（各自区间内随机时间），与 `run_window` 互斥 |
 | `target_distance_km` | 目标距离（公里），默认 `2.0` |
 | `max_pace_minutes` / `min_pace_minutes` | 结束前要求的配速区间，默认 `3.0 ~ 10.0` 分/公里 |
 | `check_after_minutes` | 开始跑步后先等多久再检查距离（正常 2 km 约需 12 分钟），默认 `12` |
@@ -143,6 +145,38 @@ python -m venv .venv
 - 成功跑完并关闭两个 App 后会自动关闭 MuMu 模拟器（`shutdown_emulator` 默认 `true`）；下次运行会自动重新拉起。如不想自动关闭，可在 `config.json` 里设为 `false`
 
 ## 定时方式（三选一）
+
+### 区间随机时间（`run_window`）
+
+在 `config.json` 中设置一个每日时间区间后，`run.py`（**不带 `--now`**）会在区间内随机选一个时间执行（分钟粒度）：
+
+```json
+"run_window": {"start": "07:00", "end": "08:30"}
+```
+
+- 当天第一次解析时随机选一个时间并写入 `logs/.next_run`；当天内重启会复用该时间，不会重新随机；
+- 区间内已过随机时间但未到区间结束：立即执行；已过整个区间：顺延到次日的随机时间；
+- `--at HH:MM` 仍可强制固定时间，`--now` 仍为立即执行（忽略 `run_window`）；
+- 使用 Windows 计划任务时，`scripts\install_task.ps1` 检测到 `run_window` 会在**区间起点**启动 `run.py`（不带 `--now`），由脚本等待随机时间；未配置时行为不变（运行一键入口）。
+
+#### 一天多个时间段（`run_windows`）
+
+需要一天执行多次时，用数组配置多个时间段，每个时间段各执行一次（随机时间在各自区间内）：
+
+```json
+"run_windows": [
+  {"start": "06:30", "end": "07:30"},
+  {"start": "12:00", "end": "13:00"},
+  {"start": "09:00", "end": "10:00"}
+]
+```
+
+- `run.py`（不带 `--now`）会依次等待每个时间段的随机时间并各执行一次，进程持续到当天最后一个时间段结束；
+- 运行时会自动按时间先后排序执行（上例实际顺序：06:30-07:30 → 09:00-10:00 → 12:00-13:00）；
+- 每个时间段的随机时间与完成状态保存在 `logs/.run_windows_state.json`：当天重启会跳过已完成的时间段、继续未完成的时间段；
+- 时间段之间不能重叠；`run_window` 与 `run_windows` 只能设置一个；
+- 多时间段模式下每个时间段都会跑一次（会产生多条跑步记录），`skip_if_success_today` 不再阻止后续时间段；
+- Windows 计划任务会在**第一个时间段起点**触发 `run.py`（`install_task.ps1` 自动识别）。
 
 1. **DeepSeek Harness 自动任务**（专用自动任务会话）：每天 07:00 触发一条任务提示，由 Agent 执行
    `run.py --now`。前提：到点时 DSH 客户端保持运行。

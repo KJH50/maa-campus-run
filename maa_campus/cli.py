@@ -17,6 +17,7 @@ from .emulator import ensure_emulator, make_adb
 from .evidence import save_shot
 from .flow import run_flow
 from .maa_tasks import build_tasker
+from .schedule import all_windows, resolve_target
 from .tasks import post_and_wait
 
 BASE = Path(__file__).resolve().parent.parent
@@ -68,6 +69,16 @@ def cleanup_old_logs(cfg: dict, logger: logging.Logger) -> None:
         logger.info("已清理 %s 天前的截图/日志 %s 个", days, removed)
 
 
+def wait_until_dt(target: datetime, logger: logging.Logger) -> None:
+    """等待到指定时间点（可能已过，此时立即返回）。"""
+    now = datetime.now()
+    if target > now:
+        logger.info("等待到 %s（还有 %.1f 分钟）", target.strftime("%Y-%m-%d %H:%M"),
+                    (target - now).total_seconds() / 60)
+    while datetime.now() < target:
+        time.sleep(min(30, max(1, (target - datetime.now()).total_seconds())))
+
+
 def wait_until(hhmm: str, logger: logging.Logger) -> None:
     """等到当天的 HH:MM（已过则等到明天）。"""
     h, m = (int(x) for x in hhmm.split(":"))
@@ -75,10 +86,65 @@ def wait_until(hhmm: str, logger: logging.Logger) -> None:
     target = now.replace(hour=h, minute=m, second=0, microsecond=0)
     if target <= now:
         target += timedelta(days=1)
-    logger.info("等待到 %s（还有 %.1f 分钟）", target.strftime("%Y-%m-%d %H:%M"),
-                (target - now).total_seconds() / 60)
-    while datetime.now() < target:
-        time.sleep(min(30, max(1, (target - datetime.now()).total_seconds())))
+    wait_until_dt(target, logger)
+
+
+def run_multi_window_day(cfg: dict, logger: logging.Logger, log_dir: Path, run_once,
+                         now_fn=datetime.now, sleep_fn=time.sleep) -> int:
+    """多时间段模式：当天每个时间段最多执行一次（区间内随机时间），返回汇总退出码。"""
+    from .parallel import aggregate_exit
+    from .schedule import ensure_windows_state, save_windows_state, window_key
+
+    day = now_fn().date()
+    bounds_list = all_windows(cfg)
+    state = ensure_windows_state(cfg, day, log_dir)
+    results: list[tuple[str, int]] = []
+
+    for bounds in bounds_list:
+        key = window_key(bounds)
+        entry = state.get(key) or {}
+        if entry.get("done"):
+            logger.info("时间段 %s 今日已完成，跳过", key)
+            continue
+        if entry.get("missed"):
+            logger.info("时间段 %s 已错过，跳过", key)
+            continue
+
+        (h1, m1), (h2, m2) = bounds
+        now = now_fn()
+        end_dt = now.replace(hour=h2, minute=m2, second=0, microsecond=0)
+        target_txt = str(entry.get("target") or f"{h1:02d}:{m1:02d}")
+        th, tm = (int(x) for x in target_txt.split(":"))
+        target_dt = now.replace(hour=th, minute=tm, second=0, microsecond=0)
+
+        if now > end_dt:
+            entry["missed"] = True
+            state[key] = entry
+            save_windows_state(log_dir, day, state)
+            logger.warning("时间段 %s 已结束（当前 %02d:%02d），跳过", key, now.hour, now.minute)
+            continue
+        if target_dt > now:
+            logger.info("时间段 %s：随机执行时间 %s，等待中 ...", key, target_txt)
+            while now_fn() < target_dt:
+                sleep_fn(min(30, max(1, (target_dt - now_fn()).total_seconds())))
+
+        logger.info("时间段 %s：开始执行（计划时间 %s）", key, target_txt)
+        code = run_once()
+        results.append((key, code))
+        if code == 0:
+            entry["done"] = True
+        else:
+            logger.warning("时间段 %s 执行失败（退出码 %s），继续下一时间段", key, code)
+        state[key] = entry
+        save_windows_state(log_dir, day, state)
+
+    if not results:
+        logger.info("多时间段模式：今日无待执行时间段（已完成或已错过）")
+        return 0
+    result = aggregate_exit([code for _, code in results])
+    logger.info("多时间段模式结束：%s（汇总退出码 %s）",
+                "，".join(f"{key}={code}" for key, code in results), result)
+    return result
 
 
 def cmd_probe(cfg: dict, logger: logging.Logger, text: str, focus: str | None,
@@ -104,7 +170,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="校园跑自动值守（MaaFramework，距离触发）")
     parser.add_argument("--config", default=str(BASE / "config.json"))
     parser.add_argument("--now", action="store_true", help="立即执行")
-    parser.add_argument("--at", default=None, help="指定时间 HH:MM（覆盖 config.start_time）")
+    parser.add_argument("--at", default=None, help="指定固定时间 HH:MM（覆盖 config.start_time 与 run_window）")
     parser.add_argument("--dry", action="store_true", help="安全演练：只截图/识别距离，不点击任何按钮")
     parser.add_argument("--probe", default=None, help="OCR 自检：识别指定文字后退出")
     parser.add_argument("--focus", default=None, help="--probe 时指定焦点包名")
@@ -149,7 +215,26 @@ def main() -> int:
             return cmd_probe(cfg, logger, args.probe, args.focus, args.screenshot)
 
         if not args.now:
-            wait_until(args.at or cfg["start_time"], logger)
+            if args.at:
+                wait_until(args.at, logger)
+            elif not args.dry and not args.wait_finish and all_windows(cfg):
+                instances = cfg.get("instances") or []
+                if len(instances) >= 2:
+                    from .parallel import run_parallel
+
+                    def run_once():
+                        return run_parallel(cfg, logger, Path(args.config).resolve(), force=True)
+                else:
+                    def run_once():
+                        return run_flow(cfg, logger, False, skip_start=False, force=True)
+                code = run_multi_window_day(cfg, logger, BASE / cfg.get("log_dir", "logs"),
+                                            run_once)
+                logger.info("===== 多时间段执行结束，退出码 %s =====", code)
+                return code
+            else:
+                target = resolve_target(cfg, datetime.now(),
+                                        BASE / cfg.get("log_dir", "logs"), logger)
+                wait_until_dt(target, logger)
 
         instances = cfg.get("instances") or []
         if len(instances) >= 2 and instance_env is None:
