@@ -12,6 +12,7 @@
 | `mumu_index` | int | 否 | MuMu 实例序号（默认 1） |
 | `emulator_boot_timeout_seconds` | int | 否 | 模拟器冷启动等待上限（秒，默认 `300`） |
 | `emulator_restart_on_fail` | bool | 否 | 启动超时后是否重启实例一次再重试（默认 `true`） |
+| `instances` | array | 否 | 多模拟器并行配置；≥2 项时自动并行（每项 `{name, adb_serial, mumu_index}`），为空则单实例 |
 | `start_time` | "HH:MM" | 否 | `run.py` 常驻等待/Windows 计划任务使用的执行时间（默认 `07:00`） |
 | `target_distance_km` | float | 否 | 基础目标距离（默认 `2.0`） |
 | `min_pace_minutes` / `max_pace_minutes` | float | 否 | 允许的平均配速区间（默认 3~10 分/公里） |
@@ -57,3 +58,19 @@
 | `finish_distance_max_km` | `2.2` | 结束距离上限 |
 
 > 修改 `target_distance_km` / 配速区间前请确认学校要求；`config.json` 不参与版本控制，切勿提交。
+
+## 多实例并行（可选）
+
+`instances` 配置 ≥2 项时，`run.py --now` 会为每个实例启动独立子进程并行执行同一套任务：
+
+```json
+"instances": [
+  {"name": "mumu-1", "adb_serial": "127.0.0.1:16416", "mumu_index": 1},
+  {"name": "mumu-2", "adb_serial": "127.0.0.1:16448", "mumu_index": 2}
+]
+```
+
+- `adb_serial` 端口用 `MuMuManager.exe info -v <index>` 的 `adb_port` 确认；
+- 两个实例都需要安装并登录两个 App；
+- 并行时每个实例独立写日志 `logs/run_YYYYMMDD_<name>.log` 与当日标记 `.last_success_<name>`；
+- 退出码汇总规则见 README「多模拟器并行」；单实例配置保持不变。

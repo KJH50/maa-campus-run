@@ -42,6 +42,7 @@ maa-campus-run/
 │   ├── cli.py                 #   参数解析、日志、配置校验、日志清理、定时等待、OCR 自检
 │   ├── flow.py                #   主业务流程（准备→开始→校验→等待→结束→停止）
 │   ├── emulator.py            #   模拟器生命周期（adb 连接 / MuMu 拉起 / 关闭）
+│   ├── parallel.py            #   多实例并行编排（每个实例独立子进程）
 │   ├── maa_tasks.py           #   MaaFramework 资源加载、控制器绑定、OCR 原语
 │   ├── tasks.py               #   MaaFramework 任务投递/等待
 │   ├── distance.py            #   距离/配速/时间 OCR 读取与解析
@@ -87,6 +88,7 @@ python -m venv .venv
 |---|---|
 | `adb_path` / `adb_serial` | adb 路径与 MuMu 实例地址（必填） |
 | `mumu_manager` / `mumu_index` | 模拟器未启动时自动拉起（可留空） |
+| `instances` | 多模拟器并行配置（数组，≥2 项时自动并行）；每项 `{name, adb_serial, mumu_index}`，为空则单实例运行 |
 | `emulator_boot_timeout_seconds` / `emulator_restart_on_fail` | 冷启动等待上限（秒，默认 `300`）；超时后是否重启实例一次再重试（默认 `true`） |
 | `start_time` | 每天几点执行，默认 `07:00`（`run.py` 自身定时与 Windows 计划任务使用） |
 | `target_distance_km` | 目标距离（公里），默认 `2.0` |
@@ -148,6 +150,23 @@ python -m venv .venv
    `powershell -ExecutionPolicy Bypass -File scripts\install_task.ps1`
    （按 `config.start_time` 注册每天运行一键入口；删除加 `-Uninstall`）。
 3. **常驻等待**：`python run.py`，进程等到 `start_time` 再执行（电脑需保持开机）。
+
+## 多模拟器并行
+
+在 `config.json` 中配置 `instances`（≥2 项）后，`run.py --now` 会为每个实例启动**独立子进程**并行执行同一套流程；每个子进程有自己的 adb、MaaFw Tasker、日志与当日标记，互不影响。
+
+```json
+"instances": [
+  {"name": "mumu-1", "adb_serial": "127.0.0.1:16416", "mumu_index": 1},
+  {"name": "mumu-2", "adb_serial": "127.0.0.1:16448", "mumu_index": 2}
+]
+```
+
+- 两个模拟器都需预先安装好 RunSimulation/跑步软件 与「健行校园」并完成登录；
+- `adb_serial` 的端口以 `MuMuManager.exe info -v <index>` 输出中的 `adb_port` 为准（各实例端口不同）；
+- 日志按实例分开：`logs/run_YYYYMMDD_<name>.log`；当日成功标记也按实例区分（`.last_success_<name>`）；
+- 退出码汇总：全部成功 `0`；任一 `3`（开始/结束/关闭失败）→ `3`；否则任一 `2`（超时/未达标）→ `2`；否则 `1`；
+- `instances` 为空或只有 1 项时，行为与原来的单实例模式完全一致（`--force`、`--dry`、`--wait-finish` 对每个实例分别生效）。
 
 ## 流程细节（pipeline）
 

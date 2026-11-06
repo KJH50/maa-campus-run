@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
+import re
 import sys
 import time
 from datetime import datetime, timedelta
@@ -20,17 +22,23 @@ from .tasks import post_and_wait
 BASE = Path(__file__).resolve().parent.parent
 
 
-def setup_logger(log_dir: Path) -> logging.Logger:
+def setup_logger(log_dir: Path, suffix: str | None = None) -> logging.Logger:
     log_dir.mkdir(parents=True, exist_ok=True)
-    logger = logging.getLogger("campus")
+    name = f"campus.{suffix}" if suffix else "campus"
+    logger = logging.getLogger(name)
     logger.setLevel(logging.INFO)
     logger.handlers.clear()
-    fmt = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s", "%Y-%m-%d %H:%M:%S")
+    date_txt = f"{datetime.now():%Y%m%d}"
+    safe = re.sub(r"[^0-9A-Za-z_.-]+", "_", suffix) if suffix else ""
+    fmt_txt = "%(asctime)s [%(levelname)s] %(message)s"
+    stream_fmt = logging.Formatter(fmt_txt, "%Y-%m-%d %H:%M:%S")
     sh = logging.StreamHandler(sys.stdout)
-    sh.setFormatter(fmt)
+    sh.setFormatter(stream_fmt)
     logger.addHandler(sh)
-    fh = logging.FileHandler(log_dir / f"run_{datetime.now():%Y%m%d}.log", encoding="utf-8")
-    fh.setFormatter(fmt)
+    file_name = f"run_{date_txt}{('_' + safe) if safe else ''}.log"
+    fh = logging.FileHandler(log_dir / file_name, encoding="utf-8")
+    file_fmt = logging.Formatter((f"[{safe}] " if safe else "") + fmt_txt, "%Y-%m-%d %H:%M:%S")
+    fh.setFormatter(file_fmt)
     logger.addHandler(fh)
     return logger
 
@@ -107,7 +115,21 @@ def main() -> int:
     args = parser.parse_args()
 
     cfg = load_config(Path(args.config))
-    logger = setup_logger(BASE / cfg.get("log_dir", "logs"))
+    instance_env = os.environ.get("MAA_CAMPUS_INSTANCE")
+    if instance_env is not None:
+        try:
+            idx = int(instance_env)
+            instances = cfg.get("instances") or []
+            inst = instances[idx]
+        except (ValueError, IndexError):
+            print(f"无效的 MAA_CAMPUS_INSTANCE：{instance_env}", file=sys.stderr)
+            return 1
+        cfg["adb_serial"] = inst.get("adb_serial") or cfg["adb_serial"]
+        if inst.get("mumu_index") is not None:
+            cfg["mumu_index"] = int(inst["mumu_index"])
+        cfg["instance_name"] = str(inst.get("name") or f"instance{idx + 1}")
+
+    logger = setup_logger(BASE / cfg.get("log_dir", "logs"), cfg.get("instance_name"))
 
     try:
         validate_config(cfg)
@@ -128,6 +150,16 @@ def main() -> int:
 
         if not args.now:
             wait_until(args.at or cfg["start_time"], logger)
+
+        instances = cfg.get("instances") or []
+        if len(instances) >= 2 and instance_env is None:
+            logger.info("检测到 %d 个实例配置，进入并行模式（每个实例独立子进程）", len(instances))
+            from .parallel import run_parallel
+
+            code = run_parallel(cfg, logger, Path(args.config).resolve(),
+                                dry=args.dry, skip_start=args.wait_finish, force=args.force)
+            logger.info("===== 并行执行结束，退出码 %s =====", code)
+            return code
 
         logger.info("===== 开始执行（%s）=====", "dry 演练" if args.dry else "完整流程")
         code = run_flow(cfg, logger, args.dry, skip_start=args.wait_finish, force=args.force)

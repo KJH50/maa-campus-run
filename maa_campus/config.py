@@ -11,6 +11,7 @@ DEFAULTS: dict = {
     "adb_serial": "127.0.0.1:16416",
     "mumu_manager": "",
     "mumu_index": 1,
+    "instances": [],
     "emulator_boot_timeout_seconds": 300,
     "emulator_restart_on_fail": True,
     "start_time": "07:00",
@@ -80,5 +81,24 @@ def validate_config(cfg: dict) -> None:
         raise ValueError(f"distance_regex 不是合法正则：{e}") from e
     if cfg.get("target_distance_km") is not None and float(cfg["target_distance_km"]) <= 0:
         raise ValueError("target_distance_km 必须大于 0")
+    instances = cfg.get("instances") or []
+    if instances:
+        if not isinstance(instances, list):
+            raise ValueError("instances 必须是数组")
+        names: set[str] = set()
+        serials: set[str] = set()
+        for i, inst in enumerate(instances):
+            if not isinstance(inst, dict):
+                raise ValueError(f"instances[{i}] 必须是对象")
+            serial = str(inst.get("adb_serial") or "").strip()
+            if not serial:
+                raise ValueError(f"instances[{i}].adb_serial 不能为空")
+            if serial in serials:
+                raise ValueError(f"instances[{i}].adb_serial 重复：{serial}")
+            serials.add(serial)
+            name = str(inst.get("name") or f"instance{i + 1}").strip()
+            if name in names:
+                raise ValueError(f"instances[{i}].name 重复：{name}")
+            names.add(name)
     if missing:
         raise ValueError("缺少必填配置：" + "、".join(missing))

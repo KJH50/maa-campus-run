@@ -149,6 +149,13 @@ def test_progress_issues_normal_and_anomaly():
     assert flow.progress_issues(cfg, 4, None, None, 240)
 
 
+def test_marker_path_per_instance(tmp_path, monkeypatch):
+    monkeypatch.setattr(flow, "PROJECT_ROOT", tmp_path)
+    assert flow._marker_path({"log_dir": "logs"}) == tmp_path / "logs" / ".last_success"
+    p = flow._marker_path({"log_dir": "logs", "instance_name": "mumu 2"})
+    assert p == tmp_path / "logs" / ".last_success_mumu_2"
+
+
 def test_skip_when_already_succeeded_today(patched):
     state, calls, alerts = patched
     state["succeeded_today"] = True

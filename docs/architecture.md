@@ -8,6 +8,7 @@
 | `maa_campus/cli.py` | 参数解析、日志与配置校验、日志清理、定时等待、`--probe` OCR 自检 |
 | `maa_campus/flow.py` | 主业务流程：准备 → 开始 → 前置校验 → 等待/轮询 → 结束结算 → 停止关闭 → 关闭模拟器 |
 | `maa_campus/emulator.py` | 模拟器生命周期：`make_adb` / `ensure_emulator`（自动拉起 MuMu）/ `shutdown_emulator` |
+| `maa_campus/parallel.py` | 多实例并行编排：为 `config.instances` 每项启动独立子进程，转发日志并汇总退出码 |
 | `maa_campus/maa_tasks.py` | MaaFramework `Resource`/`Tasker`/`CustomController` 绑定与 OCR 原语（`ocr_probe`/`ocr_tap`） |
 | `maa_campus/distance.py` | OCR 文本解析：总距离、平均配速、总时间（支持 `distance_regex` 配置） |
 | `maa_campus/evidence.py` | 阶段截图（`logs/shots/`） |

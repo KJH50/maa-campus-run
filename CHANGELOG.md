@@ -8,6 +8,7 @@
 
 ### Added
 
+- 多模拟器并行：`config.json` 新增 `instances` 数组（`name` / `adb_serial` / `mumu_index`），≥2 项时 `run.py --now` 为每个实例启动独立子进程并行执行同一任务；按实例分离日志与当日标记，退出码聚合（全 0→0；任一 3→3；否则任一 2→2；否则 1）。
 - 模拟器冷启动改为轮询 `sys.boot_completed`（`emulator_boot_timeout_seconds`，默认 300 秒）；启动超时后自动重启实例一次再重试（`emulator_restart_on_fail`，默认开启）。
 - 开跑 4/12 分钟抽检增加进度合理性校验（距离/时间/配速自洽），异常时发送 `progress_anomaly` 告警（不中断流程）。
 - 当日成功标记 `logs/.last_success`：当天已成功跑过则跳过，避免重复提交；新增 `--force` 忽略该标记。

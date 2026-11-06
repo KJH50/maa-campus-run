@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 import random
+import re
 import time
 from datetime import date
 from pathlib import Path
@@ -33,8 +34,10 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 
 def _marker_path(cfg: dict) -> Path:
-    """当日成功标记文件路径（位于 logs 目录下，已被 .gitignore 忽略）。"""
-    return PROJECT_ROOT / cfg.get("log_dir", "logs") / ".last_success"
+    """当日成功标记文件路径（位于 logs 目录下，已被 .gitignore 忽略；多实例按实例名区分）。"""
+    name = str(cfg.get("instance_name") or "").strip()
+    suffix = ("_" + re.sub(r"[^0-9A-Za-z_.-]+", "_", name)) if name else ""
+    return PROJECT_ROOT / cfg.get("log_dir", "logs") / f".last_success{suffix}"
 
 
 def _already_succeeded_today(cfg: dict, logger: logging.Logger) -> bool:

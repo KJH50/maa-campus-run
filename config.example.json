@@ -3,6 +3,7 @@
     "adb_serial": "127.0.0.1:16416",
     "mumu_manager": "C:\\Program Files\\Netease\\MuMu\\nx_main\\MuMuManager.exe",
     "mumu_index": 1,
+    "instances": [],
     "emulator_boot_timeout_seconds": 300,
     "emulator_restart_on_fail": true,
     "start_time": "07:00",

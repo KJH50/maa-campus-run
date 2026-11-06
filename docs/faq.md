@@ -27,6 +27,9 @@
 **Q：同一天已经成功跑过，再运行会重复提交吗？**
 默认不会：成功完成后会写入当日标记 `logs/.last_success`，当天再次运行会自动跳过（退出码 0）。确需重跑请加 `--force`（可能重复提交记录）。
 
+**Q：如何同时用两个模拟器跑相同任务？**
+在 `config.json` 的 `instances` 中配置两个实例（`name` / `adb_serial` / `mumu_index`），`run.py --now` 会自动为每个实例启动独立子进程并行执行；日志与当日标记按实例分开。详见 [配置说明](configuration.md) 的「多实例并行」。
+
 **Q：换电脑/移动目录后无法运行？**
 `.venv` 与本机环境绑定：删除 `.venv` 后按 README 重新创建并安装依赖；同时更新 `config.json` 中的 adb/MuMu 绝对路径。
 
