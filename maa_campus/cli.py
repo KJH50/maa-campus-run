@@ -102,6 +102,7 @@ def main() -> int:
     parser.add_argument("--focus", default=None, help="--probe 时指定焦点包名")
     parser.add_argument("--screenshot", action="store_true", help="--probe 时保存截图")
     parser.add_argument("--wait-finish", action="store_true", help="跳过启动步骤，只等待距离达标后结束（已手动开跑时用）")
+    parser.add_argument("--force", action="store_true", help="忽略「当日已成功」标记，强制再执行一次（谨慎：可能重复提交）")
     parser.add_argument("--test-alert", action="store_true", help="发送一条测试告警后退出")
     args = parser.parse_args()
 
@@ -129,7 +130,7 @@ def main() -> int:
             wait_until(args.at or cfg["start_time"], logger)
 
         logger.info("===== 开始执行（%s）=====", "dry 演练" if args.dry else "完整流程")
-        code = run_flow(cfg, logger, args.dry, skip_start=args.wait_finish)
+        code = run_flow(cfg, logger, args.dry, skip_start=args.wait_finish, force=args.force)
         logger.info("===== 结束，退出码 %s =====", code)
         return code
     except Exception as e:

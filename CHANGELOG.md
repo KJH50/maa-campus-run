@@ -6,6 +6,13 @@
 
 ## [Unreleased]
 
+### Added
+
+- 模拟器冷启动改为轮询 `sys.boot_completed`（`emulator_boot_timeout_seconds`，默认 300 秒）；启动超时后自动重启实例一次再重试（`emulator_restart_on_fail`，默认开启）。
+- 开跑 4/12 分钟抽检增加进度合理性校验（距离/时间/配速自洽），异常时发送 `progress_anomaly` 告警（不中断流程）。
+- 当日成功标记 `logs/.last_success`：当天已成功跑过则跳过，避免重复提交；新增 `--force` 忽略该标记。
+- 新增离线测试：模拟器启动/重启路径、进度校验、当日跳过与成功标记（pytest 20 个用例）。
+
 ### Changed
 
 - 简化为个人项目：移除 `CONTRIBUTING.md`、`CODE_OF_CONDUCT.md`、`SECURITY.md` 及对应链接，不再维护贡献指南/行为准则/安全策略。

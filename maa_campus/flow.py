@@ -11,6 +11,8 @@ from __future__ import annotations
 import logging
 import random
 import time
+from datetime import date
+from pathlib import Path
 
 from .alerts import send_alert
 from .distance import read_stats
@@ -25,6 +27,58 @@ def _fail(cfg: dict, logger: logging.Logger, event: str, title: str, content: st
     """发送失败告警并返回退出码（统一失败路径）。"""
     send_alert(cfg, logger, event, title, content, shot)
     return code
+
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+
+def _marker_path(cfg: dict) -> Path:
+    """当日成功标记文件路径（位于 logs 目录下，已被 .gitignore 忽略）。"""
+    return PROJECT_ROOT / cfg.get("log_dir", "logs") / ".last_success"
+
+
+def _already_succeeded_today(cfg: dict, logger: logging.Logger) -> bool:
+    """当天是否已成功完成过一次（避免同日重复提交记录）。"""
+    try:
+        text = _marker_path(cfg).read_text(encoding="utf-8").strip()
+    except OSError:
+        return False
+    return text == date.today().isoformat()
+
+
+def _mark_success_today(cfg: dict, logger: logging.Logger) -> None:
+    """写入当日成功标记；失败只告警、不影响主流程。"""
+    try:
+        p = _marker_path(cfg)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(date.today().isoformat() + "\n", encoding="utf-8")
+        logger.info("已写入当日成功标记：%s", p)
+    except OSError as e:
+        logger.warning("写入当日成功标记失败（已忽略）：%s", e)
+
+
+def progress_issues(cfg: dict, minute: int, dist, pace, elapsed) -> list[str]:
+    """抽检进度合理性：距离/时间/配速是否自洽，返回异常描述列表（空列表表示正常）。"""
+    issues: list[str] = []
+    if dist is None:
+        return [f"开跑 {minute} 分钟未识别到距离"]
+    if dist <= 0.0:
+        return [f"开跑 {minute} 分钟距离仍为 0.00 km"]
+    if elapsed is None or elapsed <= 0:
+        return issues
+    minutes = elapsed / 60.0
+    derived = minutes / dist  # 由距离与总时间推算的平均配速（分/公里）
+    min_pace = float(cfg.get("min_pace_minutes", 3.0))
+    max_pace = float(cfg.get("max_pace_minutes", 10.0))
+    if derived < min_pace * 0.7 or derived > max_pace * 1.4:
+        issues.append(f"距离/时间推算配速 {derived:.2f} 分/公里，超出合理区间 {min_pace:.0f}~{max_pace:.0f}")
+    if pace is not None and abs(float(pace) - derived) > 2.0:
+        issues.append(f"OCR 配速 {float(pace):.2f} 与推算配速 {derived:.2f} 差异过大")
+    if dist > (minutes / min_pace) * 1.5:
+        issues.append(f"距离 {dist:.2f} km 相对 {minutes:.0f} 分钟偏大（疑似识别错误）")
+    if dist < (minutes / max_pace) * 0.5:
+        issues.append(f"距离 {dist:.2f} km 相对 {minutes:.0f} 分钟偏小（进度明显偏慢）")
+    return issues
 
 
 # ------------------------------------------------------------------ 启动步骤
@@ -203,8 +257,14 @@ def start_campus_run(tasker, controller, cfg: dict, logger: logging.Logger, camp
 
 
 # ------------------------------------------------------------------ 主流程
-def run_flow(cfg: dict, logger: logging.Logger, dry: bool, skip_start: bool = False) -> int:
+def run_flow(cfg: dict, logger: logging.Logger, dry: bool, skip_start: bool = False,
+             force: bool = False) -> int:
     """完整流程；dry=True 只截图 + 识别距离；skip_start=True 跳过启动步骤（已手动开跑）。"""
+    if (not dry and not force and not skip_start
+            and cfg.get("skip_if_success_today", True) and _already_succeeded_today(cfg, logger)):
+        logger.info("今日已成功完成过校园跑（见 %s），跳过本次执行以避免重复提交；--force 可忽略",
+                    _marker_path(cfg))
+        return 0
     adb = make_adb(cfg)
     if not ensure_emulator(cfg, adb, logger):
         logger.error("无法连接模拟器 %s", cfg["adb_serial"])
@@ -272,17 +332,18 @@ def run_flow(cfg: dict, logger: logging.Logger, dry: bool, skip_start: bool = Fa
             for i in range(wait_min):
                 time.sleep(60)
                 logger.info("已等待 %s/%s 分钟", i + 1, wait_min)
-                # 开跑后 2 分钟、4 分钟各抽读一次距离，尽早发现「跑了但没记录」
-                if i + 1 in (2, 4):
+                minute = i + 1
+                # 开跑 2/4 分钟抽读距离，尽早发现「跑了但没记录」；4/12 分钟做进度合理性校验
+                if minute in (2, 4, 12):
                     controller.focus_package = campus_pkg
-                    early_dist, _, _ = read_stats(tasker, cfg)
+                    early_dist, early_pace, early_elapsed = read_stats(tasker, cfg)
                     if early_dist is not None and early_dist > 0.0:
                         zero_samples = 0
-                        logger.info("开跑 %s 分钟：距离 %.2f km，记录正常", i + 1, early_dist)
+                        logger.info("开跑 %s 分钟：距离 %.2f km，记录正常", minute, early_dist)
                     else:
                         zero_samples += 1
                         logger.warning("开跑 %s 分钟：距离仍为 %s km，疑似未正常记录，继续观察",
-                                       i + 1, early_dist)
+                                       minute, early_dist)
                         if zero_samples >= 2:
                             shot = save_shot(controller, "stuck", logger)
                             logger.error("开跑 4 分钟距离仍未增长，判定未正常记录，提前结束")
@@ -290,6 +351,14 @@ def run_flow(cfg: dict, logger: logging.Logger, dry: bool, skip_start: bool = Fa
                                        "开跑后 4 分钟总距离仍为 0.00 km，可能 GPS/联动异常，请检查 App。", shot)
                             cleanup_apps(tasker, controller, cfg, logger, "开跑后距离未增长")
                             return 2
+                    if minute in (4, 12) and early_dist is not None and early_dist > 0.0:
+                        issues = progress_issues(cfg, minute, early_dist, early_pace, early_elapsed)
+                        if issues:
+                            logger.warning("开跑 %s 分钟进度合理性异常：%s", minute, "；".join(issues))
+                            shot = save_shot(controller, "progress_anomaly", logger)
+                            send_alert(cfg, logger, "progress_anomaly",
+                                       f"校园跑值守：进度异常（开跑 {minute} 分钟）",
+                                       "；".join(issues), shot)
 
     # 4) 轮询距离
     controller.focus_package = campus_pkg
@@ -410,4 +479,5 @@ def run_flow(cfg: dict, logger: logging.Logger, dry: bool, skip_start: bool = Fa
         return 2
     logger.info("全部完成：距离 %.2f km，配速 %s，已结束并关闭（本次距离阈值 %.2f km）", dist, pace_txt, target)
     shutdown_emulator(cfg, logger)
+    _mark_success_today(cfg, logger)
     return 0

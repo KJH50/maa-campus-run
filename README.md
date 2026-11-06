@@ -87,6 +87,7 @@ python -m venv .venv
 |---|---|
 | `adb_path` / `adb_serial` | adb 路径与 MuMu 实例地址（必填） |
 | `mumu_manager` / `mumu_index` | 模拟器未启动时自动拉起（可留空） |
+| `emulator_boot_timeout_seconds` / `emulator_restart_on_fail` | 冷启动等待上限（秒，默认 `300`）；超时后是否重启实例一次再重试（默认 `true`） |
 | `start_time` | 每天几点执行，默认 `07:00`（`run.py` 自身定时与 Windows 计划任务使用） |
 | `target_distance_km` | 目标距离（公里），默认 `2.0` |
 | `max_pace_minutes` / `min_pace_minutes` | 结束前要求的配速区间，默认 `3.0 ~ 10.0` 分/公里 |
@@ -99,6 +100,7 @@ python -m venv .venv
 | `campus` / `run` | 健行校园 / 跑步软件的包名与 Activity（必填） |
 | `close_apps` | 结束后是否停止模拟并关闭应用 |
 | `shutdown_emulator` | 成功跑完并关闭 App 后是否同时关闭 MuMu 模拟器，默认 `true`（下次运行会自动重新拉起） |
+| `skip_if_success_today` | 当天已成功跑过则跳过，避免重复提交，默认 `true`（`--force` 可忽略） |
 | `log_dir` / `log_retention_days` | 日志目录；截图与入口日志保留天数（默认 14，<=0 不清理） |
 | `alerts` | 失败告警：`enabled` / `type` / `webhook_url` / `on` |
 
@@ -123,6 +125,9 @@ python -m venv .venv
 
 # 6) 测试告警通道
 .venv\Scripts\python run.py --test-alert
+
+# 7) 忽略「当日已成功」标记，强制再执行（谨慎：可能重复提交记录）
+.venv\Scripts\python run.py --now --force
 ```
 
 ### 一键执行（手动，推荐）

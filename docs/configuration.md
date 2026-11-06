@@ -10,6 +10,8 @@
 | `adb_serial` | string | ✅ | 模拟器 adb 地址（如 `127.0.0.1:16416`） |
 | `mumu_manager` | string | 否 | MuMuManager 路径；配合 `mumu_index` 用于自动拉起模拟器 |
 | `mumu_index` | int | 否 | MuMu 实例序号（默认 1） |
+| `emulator_boot_timeout_seconds` | int | 否 | 模拟器冷启动等待上限（秒，默认 `300`） |
+| `emulator_restart_on_fail` | bool | 否 | 启动超时后是否重启实例一次再重试（默认 `true`） |
 | `start_time` | "HH:MM" | 否 | `run.py` 常驻等待/Windows 计划任务使用的执行时间（默认 `07:00`） |
 | `target_distance_km` | float | 否 | 基础目标距离（默认 `2.0`） |
 | `min_pace_minutes` / `max_pace_minutes` | float | 否 | 允许的平均配速区间（默认 3~10 分/公里） |
@@ -23,6 +25,7 @@
 | `run` | object | ✅ | RunSimulation：`package` / `activity` |
 | `close_apps` | bool | 否 | 结束后是否关闭两个 App（默认 true） |
 | `shutdown_emulator` | bool | 否 | 成功跑完后是否关闭 MuMu 模拟器（默认 true） |
+| `skip_if_success_today` | bool | 否 | 当天已成功跑过则跳过，避免重复提交（默认 true；CLI `--force` 可忽略） |
 | `log_dir` | string | 否 | 日志目录（默认 `logs`） |
 | `log_retention_days` | int | 否 | 截图/入口日志保留天数（默认 14，`<=0` 不清理） |
 | `alerts` | object | 否 | 失败告警：`enabled` / `type` / `webhook_url` / `on` |

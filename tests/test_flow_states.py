@@ -47,7 +47,8 @@ CFG = {
 
 @pytest.fixture
 def patched(monkeypatch):
-    state = {"samples": [], "fallback": (999.0, 7.2, 9999), "finish_fail": 0}
+    state = {"samples": [], "fallback": (999.0, 7.2, 9999), "finish_fail": 0,
+             "succeeded_today": False, "marked": False}
     calls = []
     alerts = []
 
@@ -79,6 +80,10 @@ def patched(monkeypatch):
     monkeypatch.setattr(flow, "send_alert",
                         lambda cfg, logger, event, title, content, shot=None, force=False:
                         alerts.append(event) or True)
+    monkeypatch.setattr(flow, "_already_succeeded_today",
+                        lambda cfg, logger: state["succeeded_today"])
+    monkeypatch.setattr(flow, "_mark_success_today",
+                        lambda cfg, logger: state.__setitem__("marked", True))
     monkeypatch.setattr(flow, "time", _FakeTime())
     return state, calls, alerts
 
@@ -134,3 +139,41 @@ def test_finish_retry_success(patched):
     )
     assert code == 0
     assert calls.count("CampusRunFinish") == 2
+
+
+def test_progress_issues_normal_and_anomaly():
+    cfg = {"min_pace_minutes": 3.0, "max_pace_minutes": 10.0}
+    assert flow.progress_issues(cfg, 4, 0.55, 7.3, 240) == []
+    assert flow.progress_issues(cfg, 4, 2.0, 7.3, 240)  # 4 分钟 2 km 过快/不匹配
+    assert flow.progress_issues(cfg, 4, 0.0, None, 240)
+    assert flow.progress_issues(cfg, 4, None, None, 240)
+
+
+def test_skip_when_already_succeeded_today(patched):
+    state, calls, alerts = patched
+    state["succeeded_today"] = True
+    code, calls, alerts = _run(patched, [(2.4, 7.3, 1000)])
+    assert code == 0
+    assert calls == []
+    assert alerts == []
+
+
+def test_marks_success_today(patched):
+    state, calls, alerts = patched
+    code, _, _ = _run(
+        patched,
+        [(0.6, 7.3, 130), (1.3, 7.3, 260), (2.4, 7.3, 990)],
+        (2.4, 7.3, 1000),
+    )
+    assert code == 0
+    assert state["marked"] is True
+
+
+def test_force_ignores_daily_marker(patched):
+    state, calls, alerts = patched
+    state["succeeded_today"] = True
+    state["samples"] = [(0.6, 7.3, 130), (1.3, 7.3, 260), (2.4, 7.3, 990)]
+    code = flow.run_flow(CFG, logging.getLogger("test"), dry=False, skip_start=False, force=True)
+    assert code == 0
+    assert "CampusRunFinish" in calls
+    assert state["marked"] is True

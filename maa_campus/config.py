@@ -11,6 +11,8 @@ DEFAULTS: dict = {
     "adb_serial": "127.0.0.1:16416",
     "mumu_manager": "",
     "mumu_index": 1,
+    "emulator_boot_timeout_seconds": 300,
+    "emulator_restart_on_fail": True,
     "start_time": "07:00",
     "max_wait_minutes": 120,
     "poll_seconds": 8,
@@ -23,6 +25,7 @@ DEFAULTS: dict = {
     "route_text": "标准",
     "close_apps": True,
     "shutdown_emulator": True,
+    "skip_if_success_today": True,
     "log_dir": "logs",
     "log_retention_days": 14,
     "pre_click_texts": [],
@@ -32,7 +35,7 @@ DEFAULTS: dict = {
         "enabled": False,
         "type": "generic",
         "webhook_url": "",
-        "on": ["connect_failed", "start_failed", "timeout", "stop_failed", "exception"],
+        "on": ["connect_failed", "start_failed", "timeout", "stop_failed", "exception", "progress_anomaly"],
     },
 }
 
