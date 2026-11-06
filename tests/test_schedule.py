@@ -184,3 +184,68 @@ def test_run_multi_window_day_missed_windows_are_skipped(tmp_path):
                                     now_fn=lambda: clock["now"], sleep_fn=lambda s: None)
     assert code == 0
     assert calls == []
+
+
+def _window_once_cfg():
+    return {"run_windows": [{"start": "07:00", "end": "08:00"}]}
+
+
+def test_run_window_once_active_window_runs_once(tmp_path):
+    clock = {"now": datetime(2026, 1, 1, 7, 10)}
+
+    def now_fn():
+        return clock["now"]
+
+    def sleep_fn(seconds):
+        clock["now"] += timedelta(seconds=seconds)
+
+    calls = []
+
+    def run_once():
+        calls.append(clock["now"])
+        return 0
+
+    assert cli.run_window_once(_window_once_cfg(), logging.getLogger("t"), tmp_path, run_once,
+                               now_fn=now_fn, sleep_fn=sleep_fn) == 0
+    assert len(calls) == 1
+    assert cli.run_window_once(_window_once_cfg(), logging.getLogger("t"), tmp_path, run_once,
+                               now_fn=now_fn, sleep_fn=sleep_fn) == 0
+    assert len(calls) == 1
+
+
+def test_run_window_once_waits_for_upcoming_window(tmp_path):
+    clock = {"now": datetime(2026, 1, 1, 5, 0)}
+
+    def now_fn():
+        return clock["now"]
+
+    def sleep_fn(seconds):
+        clock["now"] += timedelta(seconds=seconds)
+
+    calls = []
+
+    def run_once():
+        calls.append(clock["now"])
+        return 0
+
+    assert cli.run_window_once(_window_once_cfg(), logging.getLogger("t"), tmp_path, run_once,
+                               now_fn=now_fn, sleep_fn=sleep_fn) == 0
+    assert len(calls) == 1
+    assert datetime(2026, 1, 1, 7, 0) <= calls[0] <= datetime(2026, 1, 1, 8, 0)
+
+
+def test_run_window_once_after_all_windows_returns_0(tmp_path):
+    calls = []
+    code = cli.run_window_once(_window_once_cfg(), logging.getLogger("t"), tmp_path,
+                               lambda: calls.append("run") or 0,
+                               now_fn=lambda: datetime(2026, 1, 1, 14, 0),
+                               sleep_fn=lambda s: None)
+    assert code == 0
+    assert calls == []
+
+
+def test_run_window_once_without_windows_returns_1(tmp_path):
+    code = cli.run_window_once({}, logging.getLogger("t"), tmp_path,
+                               lambda: 0, now_fn=lambda: datetime(2026, 1, 1, 7, 0),
+                               sleep_fn=lambda s: None)
+    assert code == 1

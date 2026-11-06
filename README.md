@@ -132,6 +132,9 @@ python -m venv .venv
 
 # 7) 忽略「当日已成功」标记，强制再执行（谨慎：可能重复提交记录）
 .venv\Scripts\python run.py --now --force
+
+# 8) DSH 兼容模式：只处理当前（或下一个）时间段，区间内随机等待后执行一次并退出
+.venv\Scripts\python run.py --window-once
 ```
 
 ### 一键执行（手动，推荐）
@@ -177,6 +180,23 @@ python -m venv .venv
 - 时间段之间不能重叠；`run_window` 与 `run_windows` 只能设置一个；
 - 多时间段模式下每个时间段都会跑一次（会产生多条跑步记录），`skip_if_success_today` 不再阻止后续时间段；
 - Windows 计划任务会在**第一个时间段起点**触发 `run.py`（`install_task.ps1` 自动识别）。
+
+#### 兼容 DeepSeek Harness（DSH）自动化任务
+
+DSH 定时任务本身不能生成随机时间，可让 DSH 在**每个时间段起点附近**各触发一次，每次执行：
+
+```powershell
+.venv\Scripts\python.exe run.py --window-once
+```
+
+- 该模式只处理**当前（或下一个）时间段**：在区间内随机等待后执行一次并退出；
+- 已完成 / 已错过的段自动跳过；DSH 任务不再需要长时间挂住进程；
+- 示例 DSH RRULE（每天 3 次触发：06:30、09:30、12:30，分别落在三个区间内）：
+
+```text
+DTSTART;TZID=Asia/Shanghai:20261107T063000
+RRULE:FREQ=DAILY;BYHOUR=6,9,12;BYMINUTE=30
+```
 
 1. **DeepSeek Harness 自动任务**（专用自动任务会话）：每天 07:00 触发一条任务提示，由 Agent 执行
    `run.py --now`。前提：到点时 DSH 客户端保持运行。

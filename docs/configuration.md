@@ -31,7 +31,7 @@
 | `skip_if_success_today` | bool | 否 | 当天已成功跑过则跳过，避免重复提交（默认 true；CLI `--force` 可忽略） |
 | `log_dir` | string | 否 | 日志目录（默认 `logs`） |
 | `log_retention_days` | int | 否 | 截图/入口日志保留天数（默认 14，`<=0` 不清理） |
-| `alerts` | object | 否 | 失败告警：`enabled` / `type` / `webhook_url` / `on` |
+| `alerts` | object | 否 | 失败告警：`enabled` / `type` / `webhook_url` / `on`；`webhook_url` 为空或推送失败时写本地 `logs/alerts_YYYYMMDD.log` |
 
 ## 示例（节选）
 
@@ -84,6 +84,7 @@
 
   > 运行时按时间先后排序执行：06:30-07:30 → 09:00-10:00 → 12:00-13:00。
 - Windows 计划任务：`scripts\install_task.ps1` 检测到 `run_window`/`run_windows` 会在**第一个时间段起点**启动 `run.py`（不带 `--now`），由脚本等待随机时间；未配置时仍运行一键入口。
+- `--window-once`：DSH 兼容模式，只处理当前（或下一个）时间段，区间内随机等待后执行一次并退出；供 DSH 定时任务按多个触发点调用（如每天 06:30/09:30/12:30）。`--window-once --dry` 只做一次 dry 演练、不等待时间段。
 
 ## 多实例并行（可选）
 
