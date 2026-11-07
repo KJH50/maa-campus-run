@@ -45,6 +45,9 @@
 **Q：跑完不想留下「今天已完成」记录怎么办？**
 加 `--no-record`：不写当日成功标记，也不把时间段标记为完成，便于重复执行或同一时间段分实例执行（如 `run.py --window-once --instance mumu-1 --no-record`）。
 
+**Q：MuMu 启动后画面错位/显示异常，拖动一下窗口大小才恢复？**
+这是 MuMu 窗口/渲染表面恢复问题（常见于 `window_save_rect=true` 恢复旧窗口位置、Vulkan 渲染器、或由计划任务在隐藏/锁屏会话中拉起）。脚本已默认在连接/启动完成后 `show_window` 并对窗口做一次 1px 尺寸微调来强制刷新（`refresh_window_on_start`，默认 `true`）；若仍出现，可尝试在 MuMu 设置中关闭「记忆窗口位置」或切换渲染器。
+
 **Q：换电脑/移动目录后无法运行？**
 `.venv` 与本机环境绑定：删除 `.venv` 后按 README 重新创建并安装依赖；同时更新 `config.json` 中的 adb/MuMu 绝对路径。
 

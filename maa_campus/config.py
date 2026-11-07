@@ -16,6 +16,7 @@ DEFAULTS: dict = {
     "instances": [],
     "emulator_boot_timeout_seconds": 300,
     "emulator_restart_on_fail": True,
+    "refresh_window_on_start": True,
     "start_time": "07:00",
     "run_window": None,
     "run_windows": [],

@@ -6,6 +6,7 @@
     "instances": [],
     "emulator_boot_timeout_seconds": 300,
     "emulator_restart_on_fail": true,
+    "refresh_window_on_start": true,
     "start_time": "07:00",
     "run_window": null,
     "run_windows": [

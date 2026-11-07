@@ -12,6 +12,7 @@
 | `mumu_index` | int | 否 | MuMu 实例序号（默认 1） |
 | `emulator_boot_timeout_seconds` | int | 否 | 模拟器冷启动等待上限（秒，默认 `300`） |
 | `emulator_restart_on_fail` | bool | 否 | 启动超时后是否重启实例一次再重试（默认 `true`） |
+| `refresh_window_on_start` | bool | 否 | 连接/启动完成后自动显示并微调窗口尺寸以刷新渲染（修复画面错位，默认 `true`） |
 | `instances` | array | 否 | 多模拟器并行配置；≥2 项时自动并行（每项 `{name, adb_serial, mumu_index}`），为空则单实例 |
 | `start_time` | "HH:MM" | 否 | `run.py` 常驻等待/Windows 计划任务使用的执行时间（默认 `07:00`） |
 | `run_window` | object | 否 | 每日时间区间内随机执行：`{"start":"07:00","end":"08:30"}`；设置后 `run.py`（不带 `--now`）在区间内随机取时间，详见「定时调度」 |

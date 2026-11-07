@@ -90,6 +90,7 @@ python -m venv .venv
 | `mumu_manager` / `mumu_index` | 模拟器未启动时自动拉起（可留空） |
 | `instances` | 多模拟器并行配置（数组，≥2 项时自动并行）；每项 `{name, adb_serial, mumu_index}`，为空则单实例运行 |
 | `emulator_boot_timeout_seconds` / `emulator_restart_on_fail` | 冷启动等待上限（秒，默认 `300`）；超时后是否重启实例一次再重试（默认 `true`） |
+| `refresh_window_on_start` | 连接/启动完成后自动 `show_window` 并微调窗口尺寸刷新渲染（修复画面错位），默认 `true` |
 | `start_time` | 每天几点执行，默认 `07:00`（`run.py` 自身定时与 Windows 计划任务使用） |
 | `run_window` | 可选：每日时间区间内随机执行，如 `{"start":"07:00","end":"08:30"}`；设置后 `run.py`（不带 `--now`）会在区间内随机取一个时间，详见下方「定时方式」 |
 | `run_windows` | 可选：一天多个时间段，如 `[{...},{...}]`；每个时间段各执行一次（各自区间内随机时间），与 `run_window` 互斥 |
