@@ -25,3 +25,11 @@ def test_build_child_cmd_defaults():
     assert "--dry" not in cmd
     assert "--wait-finish" not in cmd
     assert "--force" not in cmd
+    assert "--no-record" not in cmd
+
+
+def test_build_child_cmd_no_record():
+    cmd = parallel.build_child_cmd("cfg.json", dry=False, skip_start=False, force=True,
+                                   record=False)
+    assert "--force" in cmd
+    assert "--no-record" in cmd

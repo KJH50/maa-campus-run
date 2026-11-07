@@ -27,4 +27,4 @@
 
 ## 告警
 
-`config.json` 的 `alerts.enabled=true` 时，脚本会在失败事件（`connect_failed` / `start_failed` / `timeout` / `stop_failed` / `exception`）及进度异常（`progress_anomaly`）时按配置发送告警；默认关闭。
+`config.json` 的 `alerts.enabled=true` 时，脚本会在失败事件（`connect_failed` / `start_failed` / `timeout` / `stop_failed` / `exception`）及进度异常（`progress_anomaly`）时按配置发送告警；默认关闭。`webhook_url` 未配置或推送失败时，会兜底写入 `logs/alerts_YYYYMMDD.log`（每行一条 JSON），保证失败有本地留痕。

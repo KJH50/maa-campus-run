@@ -8,9 +8,12 @@
 
 ### Added
 
+- AI 定时页面解析（实验特性）：`run.py --ai-watch` / `--ai-watch-once`，支持 interval/cron 调度、非确定画面规则判定（缺失元素/多候选/错误提示/空白/低置信度）、脱敏截图与 OpenAI 兼容视觉接口上传、结构化动作校验与执行（click/input/scroll/wait/retry/abort）、动作后复检、JSONL 日志与单实例锁；API Key 仅从环境变量读取，默认关闭。
 - 定时时间段自定义：`config.json` 新增 `run_window`（如 `{"start":"07:00","end":"08:30"}`），`run.py`（不带 `--now`）会在区间内随机取一个时间执行；当天随机时间持久化到 `logs/.next_run`，重启复用；`install_task.ps1` 检测到区间时改为在区间起点启动 `run.py`（不带 `--now`）。
 - 一天多个时间段：`config.json` 新增 `run_windows` 数组，`run.py`（不带 `--now`）依次等待每个时间段并各执行一次（各自区间内随机时间）；状态持久化到 `logs/.run_windows_state.json`，当天重启跳过已完成时间段；时间段不可重叠，与 `run_window` 互斥。
 - DSH 兼容模式：新增 `run.py --window-once`，只处理当前（或下一个）时间段，区间内随机等待后执行一次即退出，供 DSH 定时任务按多个触发点调用（例如每天 06:30/09:30/12:30）。
+- 单实例选择：新增 `--instance <name|1-based 序号>`，在多实例 `instances` 配置下只运行指定实例（对 `--now`、`--window-once` 与定时模式生效）。
+- 无痕执行：新增 `--no-record`，不写当日成功标记、不标记时间段完成（不因当日标记跳过），便于重复执行或同一时间段分实例执行。
 - 多模拟器并行：`config.json` 新增 `instances` 数组（`name` / `adb_serial` / `mumu_index`），≥2 项时 `run.py --now` 为每个实例启动独立子进程并行执行同一任务；按实例分离日志与当日标记，退出码聚合（全 0→0；任一 3→3；否则任一 2→2；否则 1）。
 - 模拟器冷启动改为轮询 `sys.boot_completed`（`emulator_boot_timeout_seconds`，默认 300 秒）；启动超时后自动重启实例一次再重试（`emulator_restart_on_fail`，默认开启）。
 - 开跑 4/12 分钟抽检增加进度合理性校验（距离/时间/配速自洽），异常时发送 `progress_anomaly` 告警（不中断流程）。

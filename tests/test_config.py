@@ -65,6 +65,24 @@ def test_validate_instances_ok():
     ]))
 
 
+def test_ai_watch_defaults_merge(tmp_path):
+    p = tmp_path / "config.json"
+    p.write_text(json.dumps({"ai_watch": {"enabled": True,
+                                         "rules": {"expected_selectors": ["x"]}}}),
+                 encoding="utf-8")
+    cfg = load_config(p)
+    assert cfg["ai_watch"]["enabled"] is True
+    assert cfg["ai_watch"]["interval_seconds"] == 300
+    assert cfg["ai_watch"]["rules"]["expected_selectors"] == ["x"]
+    assert cfg["ai_watch"]["rules"]["blank_screen"]["threshold"] == 0.98
+
+
+def test_ai_watch_invalid_cron():
+    cfg = _base_cfg(ai_watch={"enabled": True, "mode": "cron", "cron": "bad"})
+    with pytest.raises(ValueError, match="cron"):
+        validate_config(cfg)
+
+
 def test_validate_instances_missing_serial():
     with pytest.raises(ValueError, match="adb_serial"):
         validate_config(_base_cfg(instances=[{"name": "mumu-1"}]))

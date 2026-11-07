@@ -39,6 +39,12 @@
 **Q：如何同时用两个模拟器跑相同任务？**
 在 `config.json` 的 `instances` 中配置两个实例（`name` / `adb_serial` / `mumu_index`），`run.py --now` 会自动为每个实例启动独立子进程并行执行；日志与当日标记按实例分开。详见 [配置说明](configuration.md) 的「多实例并行」。
 
+**Q：如何只跑其中一个模拟器？**
+在命令后加 `--instance <name 或序号>`，例如 `run.py --window-once --instance mumu-1` 或 `run.py --now --instance 2`；其余实例不会被启动。
+
+**Q：跑完不想留下「今天已完成」记录怎么办？**
+加 `--no-record`：不写当日成功标记，也不把时间段标记为完成，便于重复执行或同一时间段分实例执行（如 `run.py --window-once --instance mumu-1 --no-record`）。
+
 **Q：换电脑/移动目录后无法运行？**
 `.venv` 与本机环境绑定：删除 `.venv` 后按 README 重新创建并安装依赖；同时更新 `config.json` 中的 adb/MuMu 绝对路径。
 

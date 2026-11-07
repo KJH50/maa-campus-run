@@ -249,3 +249,52 @@ def test_run_window_once_without_windows_returns_1(tmp_path):
                                lambda: 0, now_fn=lambda: datetime(2026, 1, 1, 7, 0),
                                sleep_fn=lambda s: None)
     assert code == 1
+
+
+def test_run_window_once_no_record_runs_again(tmp_path):
+    clock = {"now": datetime(2026, 1, 1, 7, 10)}
+
+    def now_fn():
+        return clock["now"]
+
+    def sleep_fn(seconds):
+        clock["now"] += timedelta(seconds=seconds)
+
+    calls = []
+
+    def run_once():
+        calls.append(clock["now"])
+        return 0
+
+    for _ in range(2):
+        assert cli.run_window_once(_window_once_cfg(), logging.getLogger("t"), tmp_path,
+                                   run_once, now_fn=now_fn, sleep_fn=sleep_fn,
+                                   record=False) == 0
+    assert len(calls) == 2
+    state = schedule.load_windows_state(tmp_path, datetime(2026, 1, 1).date())
+    assert state["07:00-08:00"]["done"] is False
+
+
+def test_run_multi_window_day_no_record_reruns(tmp_path):
+    clock = {"now": datetime(2026, 1, 1, 6, 0)}
+
+    def now_fn():
+        return clock["now"]
+
+    def sleep_fn(seconds):
+        clock["now"] += timedelta(seconds=seconds)
+
+    calls = []
+
+    def run_once():
+        calls.append(clock["now"])
+        return 0
+
+    for _ in range(2):
+        assert cli.run_multi_window_day(_multi_cfg(), logging.getLogger("t"), tmp_path,
+                                        run_once, now_fn=now_fn, sleep_fn=sleep_fn,
+                                        record=False) == 0
+        clock["now"] = datetime(2026, 1, 1, 6, 0)  # 模拟第二天重新开始
+    assert len(calls) == 4  # 两轮 × 两个时间段
+    state = schedule.load_windows_state(tmp_path, datetime(2026, 1, 1).date())
+    assert state["07:00-08:00"]["done"] is False

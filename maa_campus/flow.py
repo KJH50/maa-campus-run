@@ -85,8 +85,26 @@ def progress_issues(cfg: dict, minute: int, dist, pace, elapsed) -> list[str]:
 
 
 # ------------------------------------------------------------------ 启动步骤
+STOP_STATE_MARKERS = ["请先停止独立路线播放", "独立路线播放", "停止并恢复系统状态"]
+RUN_BUTTON_MARKERS = ["^开始跑步$", "^开始$", "^点击跑步$"]
+
+
+def _stop_finished_playback(tasker, logger: logging.Logger) -> bool:
+    """检测「已完成 / 独立路线播放」状态并点击停止恢复；返回是否执行过清理。"""
+    if not ocr_probe(tasker, STOP_STATE_MARKERS):
+        return False
+    logger.warning("检测到「已完成/独立路线播放」状态，先停止并恢复系统状态 ...")
+    ok = ocr_tap(tasker, ["^停止并恢复系统状态$", "^全部停止$", "^停止$"])
+    logger.info("停止并恢复：%s", "完成" if ok else "未找到停止按钮（继续尝试准备）")
+    time.sleep(2.0)
+    return True
+
+
 def prepare_run_simulation(tasker, controller, cfg: dict, logger: logging.Logger, run_pkg: str) -> bool:
-    """把 RunSimulation 开到准备跑步页，并确认路线为「标准」。"""
+    """把 RunSimulation 开到准备跑步页，并确认路线为「标准」。
+
+    若遇到「已完成 / 请先停止独立路线播放」导致的灰按钮状态，会先停止并恢复后重新准备一次。
+    """
     route = (cfg.get("route_text") or "标准").strip()
     logger.info("准备 RunSimulation（路线：%s）...", route)
     controller.focus_package = run_pkg
@@ -96,6 +114,10 @@ def prepare_run_simulation(tasker, controller, cfg: dict, logger: logging.Logger
         "PickStandard": {"expected": [f"^{route}$"]},
     }
     job = post_and_wait(tasker, "RunPrepare", override)
+    if not job.succeeded or ocr_probe(tasker, STOP_STATE_MARKERS):
+        if _stop_finished_playback(tasker, logger):
+            logger.info("清理完成/独立路线播放状态后，重新准备 RunSimulation ...")
+            job = post_and_wait(tasker, "RunPrepare", override)
     save_shot(controller, "run_prepared", logger)
     if not job.succeeded:
         logger.error("准备 RunSimulation 失败")
@@ -119,6 +141,10 @@ def prepare_campus(tasker, controller, cfg: dict, logger: logging.Logger, campus
         if ocr_probe(tasker, ["放弃这条本地记录", "放弃"]):
             logger.info("发现未正常结束的本地记录，点击「放弃」")
             ocr_tap(tasker, ["放弃这条本地记录", "放弃"])
+            time.sleep(1.0)
+            if ocr_probe(tasker, ["确认放弃", "确定放弃", "^确认$"]):
+                logger.info("点击「确认放弃」")
+                ocr_tap(tasker, ["确认放弃", "确定放弃", "^确认$"])
             time.sleep(2.0)
             continue
         if ocr_probe(tasker, ["总距离"]) and ocr_probe(tasker, start_markers):
@@ -215,6 +241,35 @@ def randomized_target(cfg: dict, logger: logging.Logger) -> float:
     return target
 
 
+def _verify_run_button_after_cleanup(tasker, controller, cfg: dict,
+                                     logger: logging.Logger) -> bool:
+    """清理后重新打开 RunSimulation，校验「开始跑步」是否恢复可用；异常不外抛。"""
+    run = cfg["run"]
+    ok = False
+    try:
+        controller.focus_package = run["package"]
+        controller.start_app(run["activity"])
+        time.sleep(2.5)
+        if not ocr_probe(tasker, RUN_BUTTON_MARKERS):
+            logger.warning("清理后未识别到「开始跑步」，尝试停止已完成/独立路线播放 ...")
+            _stop_finished_playback(tasker, logger)
+            time.sleep(1.5)
+        ok = ocr_probe(tasker, RUN_BUTTON_MARKERS)
+        if ok:
+            logger.info("清理后校验：开始跑步按钮可用")
+        else:
+            logger.warning("清理后校验：仍未恢复「开始跑步」，下次运行前请手动检查")
+            save_shot(controller, "cleanup_run_button", logger)
+    except Exception as e:  # noqa: BLE001
+        logger.warning("清理后校验异常（已忽略）：%s", e)
+    finally:
+        try:
+            controller.stop_app(run["package"])
+        except Exception as e:  # noqa: BLE001
+            logger.warning("清理后关闭 RunSimulation 失败：%s", e)
+    return ok
+
+
 def cleanup_apps(tasker, controller, cfg: dict, logger: logging.Logger, reason: str = "失败") -> None:
     """开跑失败后的现场清理：尽量「全部停止」并关闭两个 App，异常不外抛。"""
     logger.info("清理现场（%s）：尝试停止模拟并关闭应用 ...", reason)
@@ -231,6 +286,7 @@ def cleanup_apps(tasker, controller, cfg: dict, logger: logging.Logger, reason: 
         save_shot(controller, "cleanup", logger)
     except Exception as e:  # noqa: BLE001
         logger.warning("清理现场异常（已忽略）：%s", e)
+    _verify_run_button_after_cleanup(tasker, controller, cfg, logger)
 
 
 def start_run_simulation(tasker, controller, cfg: dict, logger: logging.Logger, run_pkg: str) -> bool:
@@ -261,9 +317,12 @@ def start_campus_run(tasker, controller, cfg: dict, logger: logging.Logger, camp
 
 # ------------------------------------------------------------------ 主流程
 def run_flow(cfg: dict, logger: logging.Logger, dry: bool, skip_start: bool = False,
-             force: bool = False) -> int:
-    """完整流程；dry=True 只截图 + 识别距离；skip_start=True 跳过启动步骤（已手动开跑）。"""
-    if (not dry and not force and not skip_start
+             force: bool = False, record: bool = True) -> int:
+    """完整流程；dry=True 只截图 + 识别距离；skip_start=True 跳过启动步骤（已手动开跑）。
+
+    record=False 时不写当日成功标记，也不因当日标记跳过（无痕执行，允许重复跑）。
+    """
+    if (not dry and not force and record and not skip_start
             and cfg.get("skip_if_success_today", True) and _already_succeeded_today(cfg, logger)):
         logger.info("今日已成功完成过校园跑（见 %s），跳过本次执行以避免重复提交；--force 可忽略",
                     _marker_path(cfg))
@@ -482,5 +541,8 @@ def run_flow(cfg: dict, logger: logging.Logger, dry: bool, skip_start: bool = Fa
         return 2
     logger.info("全部完成：距离 %.2f km，配速 %s，已结束并关闭（本次距离阈值 %.2f km）", dist, pace_txt, target)
     shutdown_emulator(cfg, logger)
-    _mark_success_today(cfg, logger)
+    if record:
+        _mark_success_today(cfg, logger)
+    else:
+        logger.info("--no-record：不写当日成功标记")
     return 0

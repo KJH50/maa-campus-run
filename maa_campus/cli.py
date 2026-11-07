@@ -90,11 +90,12 @@ def wait_until(hhmm: str, logger: logging.Logger) -> None:
 
 
 def run_window_once(cfg: dict, logger: logging.Logger, log_dir: Path, run_once,
-                    now_fn=datetime.now, sleep_fn=time.sleep) -> int:
+                    now_fn=datetime.now, sleep_fn=time.sleep, record: bool = True) -> int:
     """DSH 兼容模式：本次触发只处理当前（或下一个）时间段，执行一次后退出。
 
     DSH 定时任务无法生成随机时间，可在每个时间段起点附近触发，
     本函数负责在区间内随机等待、执行一次并记录该时间段完成状态。
+    record=False 时不写/不读该时间段的完成状态（无痕执行）。
     """
     from .schedule import ensure_windows_state, save_windows_state, window_key
 
@@ -132,10 +133,10 @@ def run_window_once(cfg: dict, logger: logging.Logger, log_dir: Path, run_once,
     key = window_key(bounds)
     state = ensure_windows_state(cfg, day, log_dir)
     entry = state.get(key) or {}
-    if entry.get("done"):
+    if record and entry.get("done"):
         logger.info("时间段 %s 今日已完成，跳过", key)
         return 0
-    if entry.get("missed"):
+    if record and entry.get("missed"):
         logger.info("时间段 %s 已标记错过，跳过", key)
         return 0
 
@@ -144,9 +145,10 @@ def run_window_once(cfg: dict, logger: logging.Logger, log_dir: Path, run_once,
     now = now_fn()
     target_dt = now.replace(hour=th, minute=tm, second=0, microsecond=0)
     if now > end_dt:
-        entry["missed"] = True
-        state[key] = entry
-        save_windows_state(log_dir, day, state)
+        if record:
+            entry["missed"] = True
+            state[key] = entry
+            save_windows_state(log_dir, day, state)
         logger.warning("时间段 %s 已结束，跳过", key)
         return 0
     if target_dt > now:
@@ -156,17 +158,21 @@ def run_window_once(cfg: dict, logger: logging.Logger, log_dir: Path, run_once,
 
     logger.info("时间段 %s：开始执行（计划时间 %s）", key, target_txt)
     code = run_once()
-    if code == 0:
+    if code == 0 and record:
         entry["done"] = True
     state[key] = entry
     save_windows_state(log_dir, day, state)
-    logger.info("时间段 %s 执行结束：退出码 %s", key, code)
+    logger.info("时间段 %s 执行结束：退出码 %s%s", key, code,
+                "（--no-record，不写完成状态）" if not record else "")
     return code
 
 
 def run_multi_window_day(cfg: dict, logger: logging.Logger, log_dir: Path, run_once,
-                         now_fn=datetime.now, sleep_fn=time.sleep) -> int:
-    """多时间段模式：当天每个时间段最多执行一次（区间内随机时间），返回汇总退出码。"""
+                         now_fn=datetime.now, sleep_fn=time.sleep, record: bool = True) -> int:
+    """多时间段模式：当天每个时间段最多执行一次（区间内随机时间），返回汇总退出码。
+
+    record=False 时不写/不读时间段完成状态（无痕执行，允许重复跑）。
+    """
     from .parallel import aggregate_exit
     from .schedule import ensure_windows_state, save_windows_state, window_key
 
@@ -178,10 +184,10 @@ def run_multi_window_day(cfg: dict, logger: logging.Logger, log_dir: Path, run_o
     for bounds in bounds_list:
         key = window_key(bounds)
         entry = state.get(key) or {}
-        if entry.get("done"):
+        if record and entry.get("done"):
             logger.info("时间段 %s 今日已完成，跳过", key)
             continue
-        if entry.get("missed"):
+        if record and entry.get("missed"):
             logger.info("时间段 %s 已错过，跳过", key)
             continue
 
@@ -193,9 +199,10 @@ def run_multi_window_day(cfg: dict, logger: logging.Logger, log_dir: Path, run_o
         target_dt = now.replace(hour=th, minute=tm, second=0, microsecond=0)
 
         if now > end_dt:
-            entry["missed"] = True
-            state[key] = entry
-            save_windows_state(log_dir, day, state)
+            if record:
+                entry["missed"] = True
+                state[key] = entry
+                save_windows_state(log_dir, day, state)
             logger.warning("时间段 %s 已结束（当前 %02d:%02d），跳过", key, now.hour, now.minute)
             continue
         if target_dt > now:
@@ -206,9 +213,9 @@ def run_multi_window_day(cfg: dict, logger: logging.Logger, log_dir: Path, run_o
         logger.info("时间段 %s：开始执行（计划时间 %s）", key, target_txt)
         code = run_once()
         results.append((key, code))
-        if code == 0:
+        if code == 0 and record:
             entry["done"] = True
-        else:
+        elif code != 0:
             logger.warning("时间段 %s 执行失败（退出码 %s），继续下一时间段", key, code)
         state[key] = entry
         save_windows_state(log_dir, day, state)
@@ -220,6 +227,31 @@ def run_multi_window_day(cfg: dict, logger: logging.Logger, log_dir: Path, run_o
     logger.info("多时间段模式结束：%s（汇总退出码 %s）",
                 "，".join(f"{key}={code}" for key, code in results), result)
     return result
+
+
+def apply_instance_selection(cfg: dict, selector: str) -> None:
+    """把 --instance 指定的实例应用为单实例配置（支持 name 或 1-based 序号）。
+
+    选择后清空 instances，使后续流程走单实例路径（与直接单实例运行一致）。
+    """
+    instances = cfg.get("instances") or []
+    if not instances:
+        raise ValueError("未配置 instances，无法使用 --instance")
+    chosen = None
+    for i, inst in enumerate(instances, 1):
+        name = str(inst.get("name") or f"instance{i}")
+        if selector == str(i) or selector == name:
+            chosen = inst
+            break
+    if chosen is None:
+        names = "、".join(f"{i}:{inst.get('name') or f'instance{i}'}"
+                         for i, inst in enumerate(instances, 1))
+        raise ValueError(f"找不到实例 {selector!r}（可用：{names}）")
+    cfg["adb_serial"] = chosen.get("adb_serial") or cfg.get("adb_serial")
+    if chosen.get("mumu_index") is not None:
+        cfg["mumu_index"] = int(chosen["mumu_index"])
+    cfg["instance_name"] = str(chosen.get("name") or "instance")
+    cfg["instances"] = []
 
 
 def cmd_probe(cfg: dict, logger: logging.Logger, text: str, focus: str | None,
@@ -253,8 +285,14 @@ def main() -> int:
     parser.add_argument("--wait-finish", action="store_true", help="跳过启动步骤，只等待距离达标后结束（已手动开跑时用）")
     parser.add_argument("--window-once", action="store_true",
                         help="DSH 兼容：只处理当前（或下一个）时间段，区间内随机等待后执行一次即退出")
+    parser.add_argument("--instance", default=None,
+                        help="只运行指定实例（instances 中的 name 或 1-based 序号），其余实例不执行")
+    parser.add_argument("--no-record", action="store_true",
+                        help="不写完成记录（当日成功标记与时间段完成状态都不写），便于重复或分实例执行")
     parser.add_argument("--force", action="store_true", help="忽略「当日已成功」标记，强制再执行一次（谨慎：可能重复提交）")
     parser.add_argument("--test-alert", action="store_true", help="发送一条测试告警后退出")
+    parser.add_argument("--ai-watch", action="store_true", help="启动 AI 定时页面检查循环（实验特性）")
+    parser.add_argument("--ai-watch-once", action="store_true", help="只执行一轮 AI 页面检查（验收/调试）")
     args = parser.parse_args()
     if args.window_once and (args.now or args.at):
         parser.error("--window-once 不能与 --now/--at 同时使用")
@@ -274,6 +312,13 @@ def main() -> int:
             cfg["mumu_index"] = int(inst["mumu_index"])
         cfg["instance_name"] = str(inst.get("name") or f"instance{idx + 1}")
 
+    if args.instance:
+        try:
+            apply_instance_selection(cfg, args.instance)
+        except ValueError as e:
+            print(f"--instance 参数错误：{e}", file=sys.stderr)
+            return 1
+
     logger = setup_logger(BASE / cfg.get("log_dir", "logs"), cfg.get("instance_name"))
 
     try:
@@ -289,6 +334,11 @@ def main() -> int:
                         "这是一条测试消息，收到即表示告警通道配置正确。", force=True)
         return 0 if ok else 1
 
+    if args.ai_watch or args.ai_watch_once:
+        from .ai_watch import run_ai_watch
+
+        return run_ai_watch(cfg, logger, once=args.ai_watch_once)
+
     try:
         if args.probe:
             return cmd_probe(cfg, logger, args.probe, args.focus, args.screenshot)
@@ -302,11 +352,14 @@ def main() -> int:
                 from .parallel import run_parallel
 
                 def run_once():
-                    return run_parallel(cfg, logger, Path(args.config).resolve(), force=True)
+                    return run_parallel(cfg, logger, Path(args.config).resolve(), force=True,
+                                        record=not args.no_record)
             else:
                 def run_once():
-                    return run_flow(cfg, logger, False, skip_start=False, force=True)
-            code = run_window_once(cfg, logger, BASE / cfg.get("log_dir", "logs"), run_once)
+                    return run_flow(cfg, logger, False, skip_start=False, force=True,
+                                    record=not args.no_record)
+            code = run_window_once(cfg, logger, BASE / cfg.get("log_dir", "logs"), run_once,
+                                   record=not args.no_record)
             logger.info("===== 单时间段执行结束，退出码 %s =====", code)
             return code
 
@@ -319,12 +372,14 @@ def main() -> int:
                     from .parallel import run_parallel
 
                     def run_once():
-                        return run_parallel(cfg, logger, Path(args.config).resolve(), force=True)
+                        return run_parallel(cfg, logger, Path(args.config).resolve(), force=True,
+                                            record=not args.no_record)
                 else:
                     def run_once():
-                        return run_flow(cfg, logger, False, skip_start=False, force=True)
+                        return run_flow(cfg, logger, False, skip_start=False, force=True,
+                                        record=not args.no_record)
                 code = run_multi_window_day(cfg, logger, BASE / cfg.get("log_dir", "logs"),
-                                            run_once)
+                                            run_once, record=not args.no_record)
                 logger.info("===== 多时间段执行结束，退出码 %s =====", code)
                 return code
             else:
@@ -338,12 +393,14 @@ def main() -> int:
             from .parallel import run_parallel
 
             code = run_parallel(cfg, logger, Path(args.config).resolve(),
-                                dry=args.dry, skip_start=args.wait_finish, force=args.force)
+                                dry=args.dry, skip_start=args.wait_finish, force=args.force,
+                                record=not args.no_record)
             logger.info("===== 并行执行结束，退出码 %s =====", code)
             return code
 
         logger.info("===== 开始执行（%s）=====", "dry 演练" if args.dry else "完整流程")
-        code = run_flow(cfg, logger, args.dry, skip_start=args.wait_finish, force=args.force)
+        code = run_flow(cfg, logger, args.dry, skip_start=args.wait_finish, force=args.force,
+                        record=not args.no_record)
         logger.info("===== 结束，退出码 %s =====", code)
         return code
     except Exception as e:

@@ -29,7 +29,8 @@ def aggregate_exit(codes: list[int]) -> int:
     return 1
 
 
-def build_child_cmd(config_path: str | Path, dry: bool, skip_start: bool, force: bool) -> list[str]:
+def build_child_cmd(config_path: str | Path, dry: bool, skip_start: bool, force: bool,
+                    record: bool = True) -> list[str]:
     """构造单个实例的子进程命令。"""
     cmd = [sys.executable, str(PROJECT_ROOT / "run.py"), "--now", "--config", str(config_path)]
     if dry:
@@ -38,18 +39,21 @@ def build_child_cmd(config_path: str | Path, dry: bool, skip_start: bool, force:
         cmd.append("--wait-finish")
     if force:
         cmd.append("--force")
+    if not record:
+        cmd.append("--no-record")
     return cmd
 
 
 def run_parallel(cfg: dict, logger: logging.Logger, config_path: str | Path,
-                 dry: bool = False, skip_start: bool = False, force: bool = False) -> int:
+                 dry: bool = False, skip_start: bool = False, force: bool = False,
+                 record: bool = True) -> int:
     """并行执行 config.instances；返回汇总退出码。"""
     instances = cfg.get("instances") or []
     if len(instances) < 2:
         logger.error("并行模式需要至少 2 个 instances 配置")
         return 1
 
-    cmd = build_child_cmd(config_path, dry, skip_start, force)
+    cmd = build_child_cmd(config_path, dry, skip_start, force, record)
     procs: list[tuple[str, subprocess.Popen]] = []
     for i, inst in enumerate(instances):
         name = str(inst.get("name") or f"instance{i + 1}")

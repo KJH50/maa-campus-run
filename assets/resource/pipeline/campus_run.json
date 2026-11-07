@@ -3,12 +3,27 @@
         "action": "StartApp",
         "package": "local.runsimulation.publicapp/.MainActivity",
         "next": [
-            "CheckStandard"
+            "CheckStopState"
         ],
         "timeout": 12000,
         "on_error": [
             "RunPrepared"
         ]
+    },
+    "CheckStopState": {
+        "recognition": "OCR",
+        "expected": [
+            "^停止并恢复系统状态$",
+            "^全部停止$"
+        ],
+        "action": "Click",
+        "next": [
+            "CheckStandard"
+        ],
+        "on_error": [
+            "CheckStandard"
+        ],
+        "timeout": 4000
     },
     "CheckStandard": {
         "recognition": "OCR",

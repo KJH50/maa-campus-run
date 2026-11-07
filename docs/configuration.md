@@ -101,3 +101,5 @@
 - 两个实例都需要安装并登录两个 App；
 - 并行时每个实例独立写日志 `logs/run_YYYYMMDD_<name>.log` 与当日标记 `.last_success_<name>`；
 - 退出码汇总规则见 README「多模拟器并行」；单实例配置保持不变。
+- 临时只跑其中一个实例：`--instance <name|1-based 序号>`（如 `--instance mumu-1`），其余实例不启动；可用于 `--now`、`--window-once` 及定时模式。
+- 无痕执行：`--no-record` 不写当日成功标记，也不把时间段标记为完成（`--window-once`/多时间段/单实例均生效），便于重复执行或同一时间段分实例执行。

@@ -184,3 +184,14 @@ def test_force_ignores_daily_marker(patched):
     assert code == 0
     assert "CampusRunFinish" in calls
     assert state["marked"] is True
+
+
+def test_no_record_skips_marker_and_dedupe(patched):
+    state, calls, alerts = patched
+    state["succeeded_today"] = True
+    state["samples"] = [(0.6, 7.3, 130), (1.3, 7.3, 260), (2.4, 7.3, 990)]
+    code = flow.run_flow(CFG, logging.getLogger("test"), dry=False, skip_start=False,
+                         record=False)
+    assert code == 0
+    assert "CampusRunFinish" in calls  # 不因当日标记跳过
+    assert state["marked"] is False  # 不写当日成功标记

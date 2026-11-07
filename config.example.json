@@ -18,8 +18,8 @@
             "end": "13:00"
         },
         {
-            "start": "09:00",
-            "end": "10:00"
+            "start": "21:00",
+            "end": "22:00"
         }
     ],
     "max_wait_minutes": 120,
@@ -57,5 +57,103 @@
             "exception",
             "progress_anomaly"
         ]
+    },
+    "ai_watch": {
+        "enabled": false,
+        "mode": "interval",
+        "interval_seconds": 300,
+        "cron": "",
+        "cycle_timeout_seconds": 120,
+        "max_retries": 1,
+        "backoff_seconds": 10,
+        "lock_stale_seconds": 300,
+        "cooldown_seconds": 30,
+        "log_dir": "logs/ai_watch",
+        "target": {
+            "package": "yx.c520.xyz",
+            "display": 0,
+            "url": "app://健行校园/校园跑页"
+        },
+        "capture": {
+            "format": "jpeg",
+            "quality": 75,
+            "max_width": 1280,
+            "mask_regions": [
+                {
+                    "x": 0,
+                    "y": 0,
+                    "w": 300,
+                    "h": 120
+                }
+            ]
+        },
+        "rules": {
+            "expected_selectors": [
+                "^开始$|点击跑步|总距离"
+            ],
+            "structure_selectors": [],
+            "unique_selectors": [
+                "^开始$"
+            ],
+            "error_keywords": [
+                "验证码",
+                "网络异常",
+                "加载失败",
+                "重新登录"
+            ],
+            "missing_expected": {
+                "enabled": true
+            },
+            "selector_mismatch": {
+                "enabled": true
+            },
+            "multiple_candidates": {
+                "enabled": true
+            },
+            "error_keyword": {
+                "enabled": true
+            },
+            "blank_screen": {
+                "enabled": true,
+                "threshold": 0.98
+            },
+            "low_confidence": {
+                "enabled": true,
+                "threshold": 0.5
+            },
+            "ocr_empty": {
+                "enabled": true
+            }
+        },
+        "ai": {
+            "provider": "mock",
+            "env_endpoint": "DEEPSEEK_ENDPOINT",
+            "env_api_key": "DEEPSEEK_API_KEY",
+            "env_model": "DEEPSEEK_MODEL",
+            "timeout_seconds": 30,
+            "json_mode": false,
+            "mock_response": {
+                "action": "wait",
+                "target": null,
+                "params": {
+                    "seconds": 3
+                },
+                "confidence": 0.9,
+                "reason": "示例：页面加载中，等待 3 秒"
+            }
+        },
+        "action": {
+            "allowed": [
+                "click",
+                "input",
+                "scroll",
+                "wait",
+                "retry",
+                "abort"
+            ],
+            "confidence_threshold": 0.7,
+            "max_wait_seconds": 30,
+            "max_retries": 2
+        }
     }
 }

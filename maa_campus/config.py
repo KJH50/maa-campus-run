@@ -42,6 +42,52 @@ DEFAULTS: dict = {
         "webhook_url": "",
         "on": ["connect_failed", "start_failed", "timeout", "stop_failed", "exception", "progress_anomaly"],
     },
+    "ai_watch": {
+        "enabled": False,
+        "mode": "interval",
+        "interval_seconds": 300,
+        "cron": "",
+        "cycle_timeout_seconds": 120,
+        "max_retries": 1,
+        "backoff_seconds": 10,
+        "lock_stale_seconds": 300,
+        "cooldown_seconds": 30,
+        "log_dir": "logs/ai_watch",
+        "target": {"package": "", "display": 0, "url": ""},
+        "capture": {
+            "format": "jpeg",
+            "quality": 75,
+            "max_width": 1280,
+            "mask_regions": [],
+        },
+        "rules": {
+            "expected_selectors": [],
+            "structure_selectors": [],
+            "unique_selectors": [],
+            "error_keywords": [],
+            "missing_expected": {"enabled": True},
+            "selector_mismatch": {"enabled": True},
+            "multiple_candidates": {"enabled": True},
+            "error_keyword": {"enabled": True},
+            "blank_screen": {"enabled": True, "threshold": 0.98},
+            "low_confidence": {"enabled": True, "threshold": 0.5},
+            "ocr_empty": {"enabled": True},
+        },
+        "ai": {
+            "provider": "mock",
+            "env_endpoint": "DEEPSEEK_ENDPOINT",
+            "env_api_key": "DEEPSEEK_API_KEY",
+            "env_model": "DEEPSEEK_MODEL",
+            "timeout_seconds": 30,
+            "json_mode": False,
+        },
+        "action": {
+            "allowed": ["click", "input", "scroll", "wait", "retry", "abort"],
+            "confidence_threshold": 0.7,
+            "max_wait_seconds": 30,
+            "max_retries": 2,
+        },
+    },
 }
 
 REQUIRED: list[str] = [
@@ -63,17 +109,22 @@ def _get(cfg: dict, dotted: str):
     return cur
 
 
+def _deep_merge(base: dict, override: dict) -> dict:
+    """递归合并配置（override 优先，dict 逐层合并）。"""
+    out = dict(base)
+    for key, value in (override or {}).items():
+        if isinstance(value, dict) and isinstance(out.get(key), dict):
+            out[key] = _deep_merge(out[key], value)
+        else:
+            out[key] = value
+    return out
+
+
 def load_config(path: Path) -> dict:
-    """读取 JSON 配置（允许 BOM），缺失项用默认值补齐（campus/run/alerts 做嵌套合并）。"""
+    """读取 JSON 配置（允许 BOM），缺失项用默认值补齐（嵌套配置递归合并）。"""
     with open(path, "r", encoding="utf-8-sig") as f:
         raw = json.load(f) or {}
-    cfg = dict(DEFAULTS)
-    cfg.update(raw)
-    for key in ("campus", "run", "alerts"):
-        merged = dict(DEFAULTS[key])
-        merged.update(raw.get(key) or {})
-        cfg[key] = merged
-    return cfg
+    return _deep_merge(DEFAULTS, raw)
 
 
 def validate_config(cfg: dict) -> None:
@@ -99,6 +150,25 @@ def validate_config(cfg: dict) -> None:
         raise ValueError("run_window 与 run_windows 只能设置一个")
     if cfg.get("target_distance_km") is not None and float(cfg["target_distance_km"]) <= 0:
         raise ValueError("target_distance_km 必须大于 0")
+    aw = cfg.get("ai_watch") or {}
+    if aw.get("enabled"):
+        from .ai_vision import ALLOWED_ACTIONS
+        from .cron import parse_cron
+
+        mode = str(aw.get("mode") or "interval").lower()
+        if mode not in ("interval", "cron"):
+            raise ValueError("ai_watch.mode 只能是 interval 或 cron")
+        if mode == "interval" and float(aw.get("interval_seconds") or 0) <= 0:
+            raise ValueError("ai_watch.interval_seconds 必须大于 0")
+        if mode == "cron":
+            try:
+                parse_cron(str(aw.get("cron") or ""))
+            except ValueError as e:
+                raise ValueError(f"ai_watch.cron 配置错误：{e}") from e
+        allowed = (aw.get("action") or {}).get("allowed") or []
+        bad = [a for a in allowed if a not in ALLOWED_ACTIONS]
+        if bad:
+            raise ValueError(f"ai_watch.action.allowed 含不支持的动作：{bad}")
     instances = cfg.get("instances") or []
     if instances:
         if not isinstance(instances, list):

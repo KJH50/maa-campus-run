@@ -135,6 +135,13 @@ python -m venv .venv
 
 # 8) DSH 兼容模式：只处理当前（或下一个）时间段，区间内随机等待后执行一次并退出
 .venv\Scripts\python run.py --window-once
+
+# 9) 只运行指定实例（instances 中的 name 或 1-based 序号；其余实例不启动）
+.venv\Scripts\python run.py --now --instance mumu-1
+.venv\Scripts\python run.py --window-once --instance 2
+
+# 10) 无痕执行：不写当日成功标记 / 时间段完成状态（便于重复或分实例执行）
+.venv\Scripts\python run.py --window-once --instance mumu-1 --no-record
 ```
 
 ### 一键执行（手动，推荐）
@@ -198,12 +205,37 @@ DTSTART;TZID=Asia/Shanghai:20261107T063000
 RRULE:FREQ=DAILY;BYHOUR=6,9,12;BYMINUTE=30
 ```
 
+若某次只想跑其中一个模拟器，加 `--instance` 即可（name 或 1-based 序号）：
+
+```powershell
+.venv\Scripts\python.exe run.py --window-once --instance mumu-1
+```
+
+若本次不想写入完成记录（例如同一时间段稍后还要用另一实例再跑），加 `--no-record`：
+
+```powershell
+.venv\Scripts\python.exe run.py --window-once --instance mumu-1 --no-record
+```
+
 1. **DeepSeek Harness 自动任务**（专用自动任务会话）：每天 07:00 触发一条任务提示，由 Agent 执行
    `run.py --now`。前提：到点时 DSH 客户端保持运行。
 2. **Windows 计划任务**（更稳，不依赖 DSH）：
    `powershell -ExecutionPolicy Bypass -File scripts\install_task.ps1`
    （按 `config.start_time` 注册每天运行一键入口；删除加 `-Uninstall`）。
 3. **常驻等待**：`python run.py`，进程等到 `start_time` 再执行（电脑需保持开机）。
+
+## AI 定时页面解析（实验特性）
+
+可选的 AI 页面值守：按周期/cron 检查页面，出现「非确定画面」时截图（先脱敏）并上传 AI 解析，按返回的结构化 JSON 执行 click/input/scroll/wait/retry/abort，并复检页面。
+
+```powershell
+.venv\Scripts\python.exe run.py --ai-watch-once   # 只跑一轮（验收/调试）
+.venv\Scripts\python.exe run.py --ai-watch        # 常驻循环
+```
+
+- 默认关闭；启用与配置见 [docs/ai_watch.md](docs/ai_watch.md)；
+- API Key 仅从环境变量读取（默认 `DEEPSEEK_API_KEY` / `DEEPSEEK_ENDPOINT` / `DEEPSEEK_MODEL`），不写入仓库/日志；
+- 支持 `mock` provider 做离线验收，正常页面不会上传截图。
 
 ## 多模拟器并行
 
@@ -221,6 +253,7 @@ RRULE:FREQ=DAILY;BYHOUR=6,9,12;BYMINUTE=30
 - 日志按实例分开：`logs/run_YYYYMMDD_<name>.log`；当日成功标记也按实例区分（`.last_success_<name>`）；
 - 退出码汇总：全部成功 `0`；任一 `3`（开始/结束/关闭失败）→ `3`；否则任一 `2`（超时/未达标）→ `2`；否则 `1`；
 - `instances` 为空或只有 1 项时，行为与原来的单实例模式完全一致（`--force`、`--dry`、`--wait-finish` 对每个实例分别生效）。
+- 临时只跑其中一台：加 `--instance mumu-1`（或序号 `1`），其余实例不启动；该参数对 `--now`、`--window-once` 与定时模式均生效。
 
 ## 流程细节（pipeline）
 
