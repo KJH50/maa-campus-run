@@ -89,12 +89,16 @@ python -m venv .venv
 | `adb_path` / `adb_serial` | adb 路径与 MuMu 实例地址（必填） |
 | `mumu_manager` / `mumu_index` | 模拟器未启动时自动拉起（可留空） |
 | `instances` | 多模拟器并行配置（数组，≥2 项时自动并行）；每项 `{name, adb_serial, mumu_index}`，为空则单实例运行 |
+| `instance_start_stagger_seconds` / `run_lock_stale_seconds` | 双实例错峰启动间隔（默认 20 秒）；实例运行锁过期时间（默认 1800 秒） |
 | `emulator_boot_timeout_seconds` / `emulator_restart_on_fail` | 冷启动等待上限（秒，默认 `300`）；超时后是否重启实例一次再重试（默认 `true`） |
 | `refresh_window_on_start` | 连接/启动完成后自动 `show_window` 并微调窗口尺寸刷新渲染（修复画面错位），默认 `true` |
 | `start_time` | 每天几点执行，默认 `07:00`（`run.py` 自身定时与 Windows 计划任务使用） |
 | `run_window` | 可选：每日时间区间内随机执行，如 `{"start":"07:00","end":"08:30"}`；设置后 `run.py`（不带 `--now`）会在区间内随机取一个时间，详见下方「定时方式」 |
 | `run_windows` | 可选：一天多个时间段，如 `[{...},{...}]`；每个时间段各执行一次（各自区间内随机时间），与 `run_window` 互斥 |
 | `target_distance_km` | 目标距离（公里），默认 `2.0` |
+| `max_runs` | 最高跑步次数（读取校园跑界面「已跑 X 次」或首页「26次/60次」，达到后跳过；`0` 表示不限制） |
+| `run_count_patterns` / `log_run_count` | 自定义「已跑次数」OCR 正则（默认支持「已跑 X 次」「X次/Y次」等）；是否每次记录识别到的次数（默认 `false`） |
+| `finish_target_avoid_repeat` / `finish_target_min_gap_km` | 同一设备当天多次运行避免重复/相近结束距离（默认开启，间隔 `0.02` km；两台设备间互不限制） |
 | `max_pace_minutes` / `min_pace_minutes` | 结束前要求的配速区间，默认 `3.0 ~ 10.0` 分/公里 |
 | `check_after_minutes` | 开始跑步后先等多久再检查距离（正常 2 km 约需 12 分钟），默认 `12` |
 | `max_run_minutes` | 跑步总时间上限，超过就强制结束（保证 20 分钟内结束），默认 `20` |

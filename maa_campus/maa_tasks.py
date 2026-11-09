@@ -54,6 +54,34 @@ def ocr_probe(tasker, patterns: list[str]) -> bool:
     return job.succeeded
 
 
+def ocr_texts(tasker) -> list[str]:
+    """OCR 扫描当前画面，返回全部识别文本（用于读取「已跑次数」等动态文案）。"""
+    job = post_and_wait(tasker, "Probe", {"Probe": {"expected": [".+"]}})
+    if not job.succeeded:
+        return []
+    detail = job.get()
+    texts: list[str] = []
+    try:
+        nodes = getattr(detail, "nodes", None) or []
+    except Exception:  # noqa: BLE001
+        nodes = []
+    for node in nodes:
+        reco = getattr(node, "recognition", None)
+        raw = getattr(reco, "raw_detail", None) if reco is not None else None
+        if not isinstance(raw, dict):
+            continue
+        items = raw.get("all") or raw.get("filtered") or []
+        if isinstance(items, dict):
+            items = [items]
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            text = str(item.get("text") or "").strip()
+            if text:
+                texts.append(text)
+    return texts
+
+
 def ocr_tap(tasker, patterns: list[str]) -> bool:
     """OCR 定位并点击命中的文字。"""
     job = post_and_wait(tasker, "TapText", {"TapText": {"expected": patterns}})

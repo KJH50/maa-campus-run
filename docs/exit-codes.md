@@ -8,6 +8,7 @@
 | `1` | 连接/初始化失败或执行异常 | adb 不可达、MuMu 未启动/卡死、MaaFw 资源加载失败、配置校验失败 | 检查 `adb devices`、`config.json` 的 `adb_path`/`adb_serial`、`mumu_manager`；重试一次；查看异常 traceback |
 | `2` | 等待超时 / 开跑后距离未增长 / 强制结束未达标 | 12 分钟后仍未到目标距离、2/4 分钟抽检距离为 0、20 分钟上限强制结束 | 查看 `logs/shots/` 的 `stuck`/`timeout` 截图与日志最后的距离/配速；确认 App 与 GPS 联动正常；确认未重复提交记录后再决定是否重跑 |
 | `3` | 开始/结束/关闭失败 | 未能点击开始、前置校验失败、结束/确定结束按钮未找到、停止/关闭失败 | 查看对应阶段截图（`run_prepared`/`campus_prepared`/`run_started`/`campus_started`/`running_check`/`finish`/`stop`）；确认 App 未被系统弹窗遮挡 |
+| `5` | 同一实例已有运行锁（并发执行被拒绝） | 上一轮未结束、重复触发或残留锁未过期 | 等待上一轮结束；确认没有真实任务后可手动删除 `logs/.run_<instance>.lock` 或等待 `run_lock_stale_seconds` 过期 |
 
 ## 一键入口（`scripts\一键值守.cmd`）
 

@@ -76,7 +76,7 @@ def test_prepare_run_retries_after_stop_state(monkeypatch):
 
     def post(tasker, entry, override=None):
         posts.append(entry)
-        return FakeJob(True)
+        return FakeJob(len(posts) > 1)  # 第一次失败，清理后第二次成功
 
     monkeypatch.setattr(flow, "post_and_wait", post)
     monkeypatch.setattr(flow, "ocr_probe", lambda tasker, patterns: True)
@@ -89,6 +89,20 @@ def test_prepare_run_retries_after_stop_state(monkeypatch):
                                      logging.getLogger("t"), "r")
     assert ok is True
     assert posts.count("RunPrepare") == 2
+
+
+def test_prepare_run_no_extra_stop_probe_when_ready(monkeypatch):
+    probes = []
+    monkeypatch.setattr(flow, "post_and_wait", lambda *a, **k: FakeJob(True))
+    monkeypatch.setattr(flow, "ocr_probe",
+                        lambda tasker, patterns: probes.append(patterns) or False)
+    monkeypatch.setattr(flow, "save_shot", lambda *a, **k: None)
+
+    ctl = FakeController()
+    ok = flow.prepare_run_simulation(object(), ctl, {"route_text": "标准"},
+                                     logging.getLogger("t"), "r")
+    assert ok is True
+    assert probes == []  # 成功时不再做停止状态 OCR（由 pipeline 处理）
 
 
 def test_cleanup_verifies_run_button(monkeypatch):

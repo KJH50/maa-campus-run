@@ -45,6 +45,9 @@
 **Q：跑完不想留下「今天已完成」记录怎么办？**
 加 `--no-record`：不写当日成功标记，也不把时间段标记为完成，便于重复执行或同一时间段分实例执行（如 `run.py --window-once --instance mumu-1 --no-record`）。
 
+**Q：如何设置最高跑步次数？**
+在 `config.json` 设置 `"max_runs": 60`（按学校要求）。脚本在进入健行校园首页时读取「26次/60次」或「已跑 X 次」，达到上限后不开始跑步并记录 `logs/.max_runs_reached_<instance>.json`，后续触发可直接跳过；`--force` 可强制忽略。若界面文案变化，可调整 `run_count_patterns`；想在不设上限时也记录次数可设 `"log_run_count": true`。
+
 **Q：MuMu 启动后画面错位/显示异常，拖动一下窗口大小才恢复？**
 这是 MuMu 窗口/渲染表面恢复问题（常见于 `window_save_rect=true` 恢复旧窗口位置、Vulkan 渲染器、或由计划任务在隐藏/锁屏会话中拉起）。脚本已默认在连接/启动完成后 `show_window` 并对窗口做一次 1px 尺寸微调来强制刷新（`refresh_window_on_start`，默认 `true`）；若仍出现，可尝试在 MuMu 设置中关闭「记忆窗口位置」或切换渲染器。
 

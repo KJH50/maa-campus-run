@@ -8,6 +8,9 @@
 
 ### Added
 
+- 最高跑步次数：`max_runs` 从校园跑界面 OCR 读取「已跑 X 次」，达到上限后不开始跑步并记录 `logs/.max_runs_reached_<instance>.json`，后续触发可直接跳过；支持 `run_count_patterns` 自定义正则、`log_run_count` 记录次数。
+- 连续执行稳定性：新增实例级运行锁 `logs/.run_<instance>.lock`（冲突返回退出码 5、过期自动回收）、双实例错峰启动 `instance_start_stagger_seconds`（默认 20 秒）、`run_lock_stale_seconds`（默认 1800 秒）。
+- 同日去重：同一实例当天多次运行避免重复/相近结束距离（`finish_target_avoid_repeat` 默认开启、`finish_target_min_gap_km` 默认 `0.02` km），状态按实例保存在 `logs/.finish_targets_<instance>.json`；两台设备之间互不限制。
 - AI 定时页面解析（实验特性）：`run.py --ai-watch` / `--ai-watch-once`，支持 interval/cron 调度、非确定画面规则判定（缺失元素/多候选/错误提示/空白/低置信度）、脱敏截图与 OpenAI 兼容视觉接口上传、结构化动作校验与执行（click/input/scroll/wait/retry/abort）、动作后复检、JSONL 日志与单实例锁；API Key 仅从环境变量读取，默认关闭。
 - 定时时间段自定义：`config.json` 新增 `run_window`（如 `{"start":"07:00","end":"08:30"}`），`run.py`（不带 `--now`）会在区间内随机取一个时间执行；当天随机时间持久化到 `logs/.next_run`，重启复用；`install_task.ps1` 检测到区间时改为在区间起点启动 `run.py`（不带 `--now`）。
 - 一天多个时间段：`config.json` 新增 `run_windows` 数组，`run.py`（不带 `--now`）依次等待每个时间段并各执行一次（各自区间内随机时间）；状态持久化到 `logs/.run_windows_state.json`，当天重启跳过已完成时间段；时间段不可重叠，与 `run_window` 互斥。
@@ -30,6 +33,7 @@
 
 ### Fixed
 
+- 准备阶段减少重复开销：停止/已完成状态优先由 pipeline `CheckStopState` 处理，Python 仅在 `RunPrepare` 失败时兜底，避免每轮重复 OCR/点击（约省 20~40 秒）。
 - 修复 MuMu 程序化拉起后画面错位（需手动拖动窗口大小才恢复）：连接/启动完成后自动 `show_window` 并对窗口做一次 1px 尺寸 nudge，强制重建渲染表面；已在运行的实例不再重复 `launch`；新增 `refresh_window_on_start`（默认 `true`）。
 - 准备/清理流程：点击「放弃这条本地记录」后补点「确认放弃」；`RunPrepare` 新增 `CheckStopState` 节点处理「已完成/停止并恢复系统状态」灰按钮；准备失败时先停止并恢复后重试一次；失败清理后重新校验「开始跑步」是否恢复可用。
 

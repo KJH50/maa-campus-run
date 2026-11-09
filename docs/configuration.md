@@ -14,10 +14,15 @@
 | `emulator_restart_on_fail` | bool | 否 | 启动超时后是否重启实例一次再重试（默认 `true`） |
 | `refresh_window_on_start` | bool | 否 | 连接/启动完成后自动显示并微调窗口尺寸以刷新渲染（修复画面错位，默认 `true`） |
 | `instances` | array | 否 | 多模拟器并行配置；≥2 项时自动并行（每项 `{name, adb_serial, mumu_index}`），为空则单实例 |
+| `instance_start_stagger_seconds` | int | 否 | 双实例错峰启动间隔（秒，默认 `20`，0 表示同时启动） |
+| `run_lock_stale_seconds` | int | 否 | 实例运行锁过期时间（秒，默认 `1800`；异常退出后可自动回收） |
 | `start_time` | "HH:MM" | 否 | `run.py` 常驻等待/Windows 计划任务使用的执行时间（默认 `07:00`） |
 | `run_window` | object | 否 | 每日时间区间内随机执行：`{"start":"07:00","end":"08:30"}`；设置后 `run.py`（不带 `--now`）在区间内随机取时间，详见「定时调度」 |
 | `run_windows` | array | 否 | 一天多个时间段（如 06:30-07:30、12:00-13:00、09:00-10:00）；每个时间段各执行一次，与 `run_window` 互斥 |
 | `target_distance_km` | float | 否 | 基础目标距离（默认 `2.0`） |
+| `max_runs` | int | 否 | 最高跑步次数：读取校园跑界面「已跑 X 次」或首页「26次/60次」，达到后跳过本次（默认 `0` 不限制） |
+| `run_count_patterns` | array | 否 | 识别「已跑次数」的 OCR 正则列表（默认支持「已跑/已完成/累计/跑步次数 X 次」「X次/Y次」等文案） |
+| `log_run_count` | bool | 否 | 未设置上限时也读取并记录已跑次数（默认 `false`，减少 OCR 开销） |
 | `min_pace_minutes` / `max_pace_minutes` | float | 否 | 允许的平均配速区间（默认 3~10 分/公里） |
 | `check_after_minutes` | int | 否 | 开跑后先等待多久再检查（默认 12 分钟） |
 | `max_run_minutes` | int | 否 | 跑步总时间上限（默认 20 分钟，超过强制结束） |
@@ -56,6 +61,8 @@
 | 键 | 默认 | 说明 |
 |---|---|---|
 | `route_lap_km` | `0.415` | 路线单圈长度（用于随机结束点） |
+| `finish_target_avoid_repeat` | `true` | 同一实例当天避免重复使用相同/相近的结束距离（两台设备之间互不限制） |
+| `finish_target_min_gap_km` | `0.02` | 去重最小间隔（km）；候选距离差小于该值时视为「差不多」 |
 | `finish_offset_max_km` | `0.05` | 起点前最大随机偏移 |
 | `finish_coincide_prob` | `0.2` | 跑满整圈（终点与起点重合）概率 |
 | `finish_distance_max_km` | `2.2` | 结束距离上限 |

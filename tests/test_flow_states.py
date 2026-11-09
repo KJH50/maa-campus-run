@@ -84,6 +84,10 @@ def patched(monkeypatch):
                         lambda cfg, logger: state["succeeded_today"])
     monkeypatch.setattr(flow, "_mark_success_today",
                         lambda cfg, logger: state.__setitem__("marked", True))
+    monkeypatch.setattr(flow, "_load_used_finish_targets", lambda cfg: [])
+    monkeypatch.setattr(flow, "_save_used_finish_targets", lambda cfg, used: None)
+    monkeypatch.setattr(flow, "_acquire_run_lock", lambda cfg, logger: object())
+    monkeypatch.setattr(flow, "_release_run_lock", lambda lock, logger: None)
     monkeypatch.setattr(flow, "time", _FakeTime())
     return state, calls, alerts
 

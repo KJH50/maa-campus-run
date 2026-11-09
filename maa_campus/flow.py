@@ -8,7 +8,9 @@
 
 from __future__ import annotations
 
+import json
 import logging
+import os
 import random
 import re
 import time
@@ -19,7 +21,7 @@ from .alerts import send_alert
 from .distance import read_stats
 from .emulator import ensure_emulator, make_adb, shutdown_emulator
 from .evidence import save_shot
-from .maa_tasks import SETTLE_MARKERS, build_tasker, ocr_probe, ocr_tap
+from .maa_tasks import SETTLE_MARKERS, build_tasker, ocr_probe, ocr_tap, ocr_texts
 from .tasks import post_and_wait
 
 
@@ -31,6 +33,181 @@ def _fail(cfg: dict, logger: logging.Logger, event: str, title: str, content: st
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+
+def _instance_key(cfg: dict) -> str:
+    """当前实例的稳定标识（用于日志、状态文件、运行锁）；单实例为 default。"""
+    name = str(cfg.get("instance_name") or "").strip()
+    return re.sub(r"[^0-9A-Za-z_.-]+", "_", name) if name else "default"
+
+
+def _run_lock_path(cfg: dict) -> Path:
+    return PROJECT_ROOT / cfg.get("log_dir", "logs") / f".run_{_instance_key(cfg)}.lock"
+
+
+def _acquire_run_lock(cfg: dict, logger: logging.Logger) -> Path | None:
+    """获取实例级运行锁；已有未过期锁时返回 None（调用方返回退出码 5）。"""
+    path = _run_lock_path(cfg)
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+    except OSError as e:
+        logger.warning("创建运行锁目录失败（%s），拒绝执行以避免并发", e)
+        return None
+    stale = float(cfg.get("run_lock_stale_seconds", 1800))
+    if path.exists():
+        try:
+            age = time.time() - path.stat().st_mtime
+        except OSError:
+            age = 0.0
+        if age <= stale:
+            logger.warning("实例 %s 已有运行锁（%.0f 秒前创建：%s），拒绝并发执行",
+                           _instance_key(cfg), age, path)
+            return None
+        logger.warning("发现过期运行锁（%.0f 秒前），自动回收：%s", age, path)
+        try:
+            path.unlink()
+        except OSError as e:
+            logger.warning("回收过期运行锁失败：%s", e)
+            return None
+    try:
+        fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+    except FileExistsError:
+        logger.warning("实例 %s 运行锁创建冲突，拒绝并发执行", _instance_key(cfg))
+        return None
+    except OSError as e:
+        logger.warning("创建运行锁失败（%s），拒绝执行以避免并发", e)
+        return None
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        fh.write(f"pid={os.getpid()} time={date.today().isoformat()}\n")
+    return path
+
+
+def _release_run_lock(lock: Path | None, logger: logging.Logger) -> None:
+    if not lock:
+        return
+    try:
+        lock.unlink(missing_ok=True)
+    except OSError as e:
+        logger.warning("释放运行锁失败（已忽略）：%s", e)
+
+
+DEFAULT_RUN_COUNT_PATTERNS = [
+    r"已跑\D{0,8}(\d+)\s*次",
+    r"已完成\D{0,8}(\d+)\s*次",
+    r"累计\D{0,8}(\d+)\s*次",
+    r"跑步次数\D{0,8}(\d+)",
+    r"已跑\s*(\d+)\s*/\s*\d+\s*次",
+    r"(\d+)\s*次\s*/\s*(\d+)\s*次",
+]
+
+
+def _max_runs(cfg: dict) -> int:
+    try:
+        return max(0, int(cfg.get("max_runs") or 0))
+    except (TypeError, ValueError):
+        return 0
+
+
+def _need_run_count(cfg: dict) -> bool:
+    """是否需要在准备阶段读取「已跑次数」。"""
+    return _max_runs(cfg) > 0 or bool(cfg.get("log_run_count", False))
+
+
+def read_run_count(tasker, cfg: dict, logger: logging.Logger, quiet: bool = False) -> int | None:
+    """从当前页面 OCR 文本中解析「已跑 X 次」；支持配置多个正则。"""
+    texts = ocr_texts(tasker)
+    joined = "\n".join(texts)
+    patterns = cfg.get("run_count_patterns") or DEFAULT_RUN_COUNT_PATTERNS
+    for pattern in patterns:
+        try:
+            match = re.search(str(pattern), joined)
+        except re.error:
+            continue
+        if not match:
+            continue
+        try:
+            count = int(match.group(1))
+        except (TypeError, ValueError):
+            continue
+        if 0 <= count <= 100000:
+            logger.info("识别到已跑次数：%s 次", count)
+            return count
+    if not quiet:
+        logger.info("未匹配到已跑次数（max_runs=%s）；OCR 文本：%s",
+                    _max_runs(cfg), " | ".join(texts)[:300] if texts else "（空）")
+    return None
+
+
+def _remember_run_count(tasker, cfg: dict, logger: logging.Logger,
+                        quiet: bool = True) -> int | None:
+    """在准备过程中尽量早、尽量少地读取一次已跑次数（静默扫描最多 3 次）。"""
+    if not _need_run_count(cfg):
+        return None
+    if cfg.get("_observed_run_count") is not None:
+        return int(cfg["_observed_run_count"])
+    attempts = int(cfg.get("_run_count_scans", 0) or 0)
+    if quiet and attempts >= 3:
+        return None
+    cfg["_run_count_scans"] = attempts + 1
+    count = read_run_count(tasker, cfg, logger, quiet=quiet)
+    if count is not None:
+        cfg["_observed_run_count"] = count
+    return count
+
+
+def _max_runs_marker_path(cfg: dict) -> Path:
+    return PROJECT_ROOT / cfg.get("log_dir", "logs") / f".max_runs_reached_{_instance_key(cfg)}.json"
+
+
+def _max_runs_reached(cfg: dict, logger: logging.Logger) -> bool:
+    """读取「已达最高次数」标记，用于下一次触发时免启动直接跳过。"""
+    max_runs = _max_runs(cfg)
+    if max_runs <= 0:
+        return False
+    try:
+        data = json.loads(_max_runs_marker_path(cfg).read_text(encoding="utf-8"))
+        count = float(data.get("count"))
+        marked_max = float(data.get("max", 0))
+    except (OSError, ValueError, TypeError):
+        return False
+    if marked_max >= max_runs and count >= max_runs:
+        logger.info("已记录达到最高跑步次数（已跑 %.0f / 上限 %s），跳过本次执行（--force 可忽略）",
+                    count, max_runs)
+        return True
+    return False
+
+
+def _mark_max_runs_reached(cfg: dict, count: int, logger: logging.Logger) -> None:
+    max_runs = _max_runs(cfg)
+    try:
+        path = _max_runs_marker_path(cfg)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(json.dumps({"count": count, "max": max_runs,
+                                   "time": date.today().isoformat()},
+                                  ensure_ascii=False), encoding="utf-8")
+        tmp.replace(path)
+        logger.info("已记录最高跑步次数状态：已跑 %s / 上限 %s", count, max_runs)
+    except OSError as e:
+        logger.warning("写入最高跑步次数标记失败（已忽略）：%s", e)
+
+
+def _should_skip_for_max_runs(cfg: dict, count: int | None) -> bool:
+    max_runs = _max_runs(cfg)
+    return bool(max_runs > 0 and count is not None and count >= max_runs)
+
+
+def _close_after_max_runs(controller, cfg: dict, logger: logging.Logger,
+                          run_pkg: str, campus_pkg: str) -> None:
+    """达到最高次数时不开始跑步，关闭 App 并按配置关闭模拟器。"""
+    logger.info("已达到最高跑步次数，本次不开始跑步；关闭 App ...")
+    for pkg in (run_pkg, campus_pkg):
+        try:
+            controller.stop_app(pkg)
+        except Exception as e:  # noqa: BLE001
+            logger.warning("关闭 App %s 失败（已忽略）：%s", pkg, e)
+    save_shot(controller, "max_runs_reached", logger)
+    shutdown_emulator(cfg, logger)
 
 
 def _marker_path(cfg: dict) -> Path:
@@ -114,9 +291,11 @@ def prepare_run_simulation(tasker, controller, cfg: dict, logger: logging.Logger
         "PickStandard": {"expected": [f"^{route}$"]},
     }
     job = post_and_wait(tasker, "RunPrepare", override)
-    if not job.succeeded or ocr_probe(tasker, STOP_STATE_MARKERS):
+    if not job.succeeded:
+        # 停止/已完成状态优先由 pipeline 的 CheckStopState 节点处理；
+        # 这里只在准备失败时做一次兜底，避免每轮重复 OCR/点击（省 20~40s）。
         if _stop_finished_playback(tasker, logger):
-            logger.info("清理完成/独立路线播放状态后，重新准备 RunSimulation ...")
+            logger.info("准备失败后清理完成/独立路线播放状态，重新准备 RunSimulation ...")
             job = post_and_wait(tasker, "RunPrepare", override)
     save_shot(controller, "run_prepared", logger)
     if not job.succeeded:
@@ -136,6 +315,7 @@ def prepare_campus(tasker, controller, cfg: dict, logger: logging.Logger, campus
     controller.focus_package = campus_pkg
     controller.start_app(cfg["campus"]["activity"])
     time.sleep(2.0)
+    _remember_run_count(tasker, cfg, logger)
     start_markers = ["^开始$", "^点击跑步$", "点击结束跑步"]
     for attempt in range(1, 10):
         if ocr_probe(tasker, ["放弃这条本地记录", "放弃"]):
@@ -148,15 +328,18 @@ def prepare_campus(tasker, controller, cfg: dict, logger: logging.Logger, campus
             time.sleep(2.0)
             continue
         if ocr_probe(tasker, ["总距离"]) and ocr_probe(tasker, start_markers):
+            _remember_run_count(tasker, cfg, logger, quiet=False)
             logger.info("已进入校园跑页（第 %s 次检查）", attempt)
             save_shot(controller, "campus_prepared", logger)
             return True
         if ocr_probe(tasker, ["继续征程"]):
+            _remember_run_count(tasker, cfg, logger)
             logger.info("点击「继续征程」")
             ocr_tap(tasker, ["继续征程"])
             time.sleep(2.5)
             continue
         if ocr_probe(tasker, ["^首页$"]):
+            _remember_run_count(tasker, cfg, logger)
             logger.info("点击「首页」")
             ocr_tap(tasker, ["^首页$"])
             time.sleep(1.5)
@@ -203,22 +386,49 @@ def verify_running(tasker, controller, cfg: dict, logger: logging.Logger) -> boo
     return True
 
 
-def randomized_target(cfg: dict, logger: logging.Logger) -> float:
-    """本次结束距离阈值：围绕「整圈闭合点」，保证终点与起点同侧。
+def _finish_targets_key(cfg: dict) -> str:
+    """按实例区分当日已用距离（两台设备互不影响，但同一设备当天避免重复）。"""
+    return _instance_key(cfg)
 
-    RunSimulation 的「标准」路线是一条约 0.415 km 的闭环（32 个点·415m，循环 5 圈
-    ≈ 2.075 km 正好回到起点）：
-    - 默认约 20% 的概率跑满整圈 → 终点与起点重合（轨迹闭合成环）；
-    - 其余时候在起点前 20~50 m 结束 → 终点仍在起点同侧，但不重合（轨迹留下小缺口）。
-    距离始终限制在 2.00~2.20 km 内，且大于基础目标 2.00 km，不会越跑越大。
-    """
+
+def _finish_targets_path(cfg: dict) -> Path:
+    return PROJECT_ROOT / cfg.get("log_dir", "logs") / f".finish_targets_{_finish_targets_key(cfg)}.json"
+
+
+def _load_used_finish_targets(cfg: dict) -> list[float]:
+    """读取本实例当天已经用过的结束距离；日期不匹配时视为空。"""
+    try:
+        data = json.loads(_finish_targets_path(cfg).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    if not isinstance(data, dict) or data.get("date") != date.today().isoformat():
+        return []
+    try:
+        return [float(x) for x in data.get("targets") or []]
+    except (TypeError, ValueError):
+        return []
+
+
+def _save_used_finish_targets(cfg: dict, used: list[float]) -> None:
+    try:
+        path = _finish_targets_path(cfg)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(json.dumps({"date": date.today().isoformat(),
+                                   "targets": [round(float(x), 3) for x in used]},
+                                  ensure_ascii=False), encoding="utf-8")
+        tmp.replace(path)
+    except OSError:
+        pass
+
+
+def _route_geometry(cfg: dict) -> tuple[float, float, float]:
+    """返回 (base, close, hi)：基础目标、整圈闭合点、结束距离上限。"""
     import math
 
     base = float(cfg.get("target_distance_km", 2.0))
     lap = float(cfg.get("route_lap_km", 0.415))
     hi = float(cfg.get("finish_distance_max_km", 2.2))
-    max_off = float(cfg.get("finish_offset_max_km", 0.05))
-    coincide_prob = float(cfg.get("finish_coincide_prob", 0.2))
     if lap <= 0:
         lap = 0.415
     laps = max(1, math.ceil(base / lap - 1e-9))
@@ -228,16 +438,67 @@ def randomized_target(cfg: dict, logger: logging.Logger) -> float:
         close = round(laps * lap, 3)
     if close < base:  # 整圈点不足基础目标时退化
         close = round(base, 3)
+    return base, close, hi
+
+
+def _draw_random_target(cfg: dict, close: float, base: float, hi: float) -> tuple[float, str]:
+    """按原随机策略抽一次目标（20% 整圈闭合，其余起点前 20~50m）。"""
+    max_off = float(cfg.get("finish_offset_max_km", 0.05))
+    coincide_prob = float(cfg.get("finish_coincide_prob", 0.2))
     if random.random() < coincide_prob:
-        target = close
-        note = "跑满整圈：终点与起点重合，轨迹闭合成环"
+        return close, "跑满整圈：终点与起点重合，轨迹闭合成环"
+    off = random.uniform(0.02, max_off)
+    target = max(base + 0.01, min(round(close - off, 2), hi))
+    return target, f"在起点前 {off * 1000:.0f} m 结束：同侧、不重合（轨迹留小缺口）"
+
+
+def _pick_avoiding_repeats(cfg: dict, close: float, base: float, hi: float,
+                           used: list[float]) -> tuple[float, str] | None:
+    """在同一天已用距离之外抽目标；抽不到时用候选池，仍不行返回 None。"""
+    gap = float(cfg.get("finish_target_min_gap_km", 0.02))
+    for _ in range(20):
+        target, note = _draw_random_target(cfg, close, base, hi)
+        if all(abs(target - u) >= gap for u in used):
+            return target, note
+    candidates = [close] + sorted({round(close - off, 2) for off in (0.02, 0.03, 0.04, 0.05)})
+    allowed = [c for c in candidates if all(abs(c - u) >= gap for u in used)]
+    if allowed:
+        return random.choice(allowed), "避免与今日已用距离重复（候选池）"
+    return None
+
+
+def randomized_target(cfg: dict, logger: logging.Logger) -> float:
+    """本次结束距离阈值：围绕「整圈闭合点」，保证终点与起点同侧。
+
+    RunSimulation 的「标准」路线是一条约 0.415 km 的闭环（32 个点·415m，循环 5 圈
+    ≈ 2.075 km 正好回到起点）：
+    - 默认约 20% 的概率跑满整圈 → 终点与起点重合（轨迹闭合成环）；
+    - 其余时候在起点前 20~50 m 结束 → 终点仍在起点同侧，但不重合（轨迹留下小缺口）。
+    距离始终限制在 2.00~2.20 km 内，且大于基础目标 2.00 km，不会越跑越大。
+
+    多操作时按「实例」记录当天已用距离（`finish_target_avoid_repeat`，默认开启）：
+    同一设备当天多次运行尽量不与之前的距离/位置重复；两台设备之间互不限制。
+    """
+    base, close, hi = _route_geometry(cfg)
+    avoid = bool(cfg.get("finish_target_avoid_repeat", True))
+    used = _load_used_finish_targets(cfg) if avoid else []
+    picked = _pick_avoiding_repeats(cfg, close, base, hi, used) if avoid else None
+
+    if picked is not None:
+        target, note = picked
     else:
-        off = random.uniform(0.02, max_off)
-        target = round(close - off, 2)
-        note = f"在起点前 {off * 1000:.0f} m 结束：同侧、不重合（轨迹留小缺口）"
-    target = max(base + 0.01, min(target, hi))
-    logger.info("本次结束距离：%.2f km（整圈闭合点 %.3f km；%s；距离区间 %.2f~%.2f km）",
-                target, close, note, base, hi)
+        # 未开启去重，或今日可选值已用尽：退回普通随机
+        target, note = _draw_random_target(cfg, close, base, hi)
+        if avoid:
+            note += "（今日可用距离已用尽，允许重复）"
+
+    if avoid:
+        used.append(round(float(target), 3))
+        _save_used_finish_targets(cfg, used)
+
+    used_txt = ("；本机今日已用：" + "、".join(f"{u:.2f}" for u in used[:-1])) if used[:-1] else ""
+    logger.info("本次结束距离：%.2f km（整圈闭合点 %.3f km；%s；距离区间 %.2f~%.2f km%s）",
+                target, close, note, base, hi, used_txt)
     return target
 
 
@@ -318,7 +579,21 @@ def start_campus_run(tasker, controller, cfg: dict, logger: logging.Logger, camp
 # ------------------------------------------------------------------ 主流程
 def run_flow(cfg: dict, logger: logging.Logger, dry: bool, skip_start: bool = False,
              force: bool = False, record: bool = True) -> int:
-    """完整流程；dry=True 只截图 + 识别距离；skip_start=True 跳过启动步骤（已手动开跑）。
+    """完整流程入口：真实执行时先获取实例级运行锁，冲突返回退出码 5；dry 不占锁。"""
+    if dry:
+        return _run_flow_impl(cfg, logger, dry, skip_start, force, record)
+    lock = _acquire_run_lock(cfg, logger)
+    if lock is None:
+        return 5
+    try:
+        return _run_flow_impl(cfg, logger, dry, skip_start, force, record)
+    finally:
+        _release_run_lock(lock, logger)
+
+
+def _run_flow_impl(cfg: dict, logger: logging.Logger, dry: bool, skip_start: bool = False,
+                   force: bool = False, record: bool = True) -> int:
+    """完整流程实现；dry=True 只截图 + 识别距离；skip_start=True 跳过启动步骤（已手动开跑）。
 
     record=False 时不写当日成功标记，也不因当日标记跳过（无痕执行，允许重复跑）。
     """
@@ -326,6 +601,9 @@ def run_flow(cfg: dict, logger: logging.Logger, dry: bool, skip_start: bool = Fa
             and cfg.get("skip_if_success_today", True) and _already_succeeded_today(cfg, logger)):
         logger.info("今日已成功完成过校园跑（见 %s），跳过本次执行以避免重复提交；--force 可忽略",
                     _marker_path(cfg))
+        return 0
+    # 上一轮已确认达到最高次数：本次触发直接跳过，免启动模拟器/打开 App
+    if not dry and not force and _max_runs_reached(cfg, logger):
         return 0
     adb = make_adb(cfg)
     if not ensure_emulator(cfg, adb, logger):
@@ -362,6 +640,27 @@ def run_flow(cfg: dict, logger: logging.Logger, dry: bool, skip_start: bool = Fa
         if not prepare_campus(tasker, controller, cfg, logger, campus_pkg):
             return _fail(cfg, logger, "start_failed", "校园跑值守：进入校园跑页失败",
                          "未能从首页点到「继续征程」，请检查 App 状态。", 3)
+
+        # 读取「已跑次数」，达到最高次数则不开始跑步
+        if _max_runs(cfg) > 0 and not force:
+            count = cfg.get("_observed_run_count")
+            if count is None:
+                count = read_run_count(tasker, cfg, logger, quiet=False)
+                if count is not None:
+                    cfg["_observed_run_count"] = count
+            if _should_skip_for_max_runs(cfg, count):
+                _mark_max_runs_reached(cfg, count, logger)
+                _close_after_max_runs(controller, cfg, logger, run_pkg, campus_pkg)
+                return 0
+            if count is None:
+                logger.warning("未能读取已跑次数，跳过最高次数判断（max_runs=%s）；"
+                               "可按实际界面文字调整 run_count_patterns", _max_runs(cfg))
+            else:
+                logger.info("已跑次数 %s / 上限 %s，未达上限，继续", count, _max_runs(cfg))
+        elif _max_runs(cfg) > 0:
+            count = cfg.get("_observed_run_count")
+            logger.warning("已跑次数 %s / 上限 %s，但 --force 强制继续",
+                           count if count is not None else "未知", _max_runs(cfg))
 
         # 可选前置点击（如路线选择），找不到自动跳过
         for t in (cfg.get("pre_click_texts") or []):

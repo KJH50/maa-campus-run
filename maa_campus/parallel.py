@@ -11,9 +11,19 @@ import os
 import subprocess
 import sys
 import threading
+import time
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+
+def _stagger_delay(cfg: dict, index: int) -> float:
+    """实例启动错峰延迟（秒）：index 0 立即，后续按配置递增。"""
+    try:
+        step = float(cfg.get("instance_start_stagger_seconds", 20) or 0)
+    except (TypeError, ValueError):
+        step = 0.0
+    return max(0.0, step) * max(0, int(index))
 
 
 def aggregate_exit(codes: list[int]) -> int:
@@ -63,6 +73,11 @@ def run_parallel(cfg: dict, logger: logging.Logger, config_path: str | Path,
         env["PYTHONIOENCODING"] = "utf-8"
         logger.info("启动并行实例 %s：adb=%s，mumu_index=%s", name,
                     inst.get("adb_serial"), inst.get("mumu_index"))
+        delay = _stagger_delay(cfg, i)
+        if delay > 0:
+            logger.info("错峰启动：%.1f 秒后启动实例 %s（降低双实例同时冷启动/渲染的峰值）",
+                        delay, name)
+            time.sleep(delay)
         p = subprocess.Popen(
             cmd, cwd=str(PROJECT_ROOT), env=env,
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT,

@@ -1,3 +1,5 @@
+import logging
+
 from maa_campus import parallel
 
 
@@ -33,3 +35,31 @@ def test_build_child_cmd_no_record():
                                    record=False)
     assert "--force" in cmd
     assert "--no-record" in cmd
+
+
+def test_stagger_delay():
+    assert parallel._stagger_delay({"instance_start_stagger_seconds": 20}, 0) == 0
+    assert parallel._stagger_delay({"instance_start_stagger_seconds": 20}, 1) == 20
+    assert parallel._stagger_delay({"instance_start_stagger_seconds": 20}, 2) == 40
+    assert parallel._stagger_delay({"instance_start_stagger_seconds": 0}, 2) == 0
+    assert parallel._stagger_delay({}, 1) == 20  # 默认 20 秒
+
+
+def test_run_parallel_staggers_instances(monkeypatch):
+    sleeps = []
+
+    class FakePopen:
+        def __init__(self, *args, **kwargs):
+            self.stdout = iter(())
+            self.returncode = 0
+
+        def wait(self):
+            return 0
+
+    monkeypatch.setattr(parallel.subprocess, "Popen", FakePopen)
+    monkeypatch.setattr(parallel.time, "sleep", lambda seconds: sleeps.append(seconds))
+    cfg = {"instances": [{"name": "mumu-1", "adb_serial": "127.0.0.1:16416", "mumu_index": 1},
+                         {"name": "mumu-2", "adb_serial": "127.0.0.1:16448", "mumu_index": 2}],
+           "instance_start_stagger_seconds": 20}
+    assert parallel.run_parallel(cfg, logging.getLogger("t"), "cfg.json") == 0
+    assert sleeps == [20]
