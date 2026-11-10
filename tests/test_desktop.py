@@ -1,4 +1,4 @@
-import pytest
+﻿import pytest
 
 from maa_campus import desktop
 
@@ -74,7 +74,7 @@ def test_cli_desktop_flag_is_additive():
 
     from maa_campus import webui
 
-    proc = subprocess.run([sys.executable, "run.py", "--help"], cwd=webui.PROJECT_ROOT,
+    proc = subprocess.run([sys.executable, "-X", "utf8", "run.py", "--help"], cwd=webui.PROJECT_ROOT,
                           capture_output=True, text=True, encoding="utf-8", errors="replace")
     assert proc.returncode == 0
     assert "--desktop" in proc.stdout

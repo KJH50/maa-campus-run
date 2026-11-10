@@ -1,4 +1,4 @@
-import json
+﻿import json
 import logging
 import os
 import time
@@ -86,7 +86,7 @@ def test_cli_pack_flag_help():
     import subprocess
     import sys
 
-    proc = subprocess.run([sys.executable, "run.py", "--help"], cwd=packaging.PROJECT_ROOT,
+    proc = subprocess.run([sys.executable, "-X", "utf8", "run.py", "--help"], cwd=packaging.PROJECT_ROOT,
                           capture_output=True, text=True, encoding="utf-8", errors="replace")
     assert proc.returncode == 0
     assert "--pack-logs" in proc.stdout

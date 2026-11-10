@@ -1,4 +1,4 @@
-import json
+﻿import json
 import subprocess
 import sys
 import threading
@@ -187,7 +187,7 @@ def test_http_endpoints(tmp_path):
 
 
 def test_cli_web_flags_are_additive():
-    proc = subprocess.run([sys.executable, "run.py", "--help"], cwd=webui.PROJECT_ROOT,
+    proc = subprocess.run([sys.executable, "-X", "utf8", "run.py", "--help"], cwd=webui.PROJECT_ROOT,
                           capture_output=True, text=True, encoding="utf-8", errors="replace")
     assert proc.returncode == 0
     assert "--web " in proc.stdout
