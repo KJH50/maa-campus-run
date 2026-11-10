@@ -50,7 +50,11 @@ maa-campus-run/
 │   ├── alerts.py              #   失败告警（generic/wecom/dingtalk/serverchan/bark）
 │   ├── adb.py                 #   adb 封装（逻辑/物理 display 映射、截图、点击、启停应用）
 │   ├── controller.py          #   MaaFramework CustomController（MuMu 多屏适配）
-│   └── config.py              #   配置加载、默认值合并与必填校验
+│   ├── config.py              #   配置加载、默认值合并与必填校验
+│   ├── webui.py               #   本地 Web 控制台（标准库 http.server，补充入口）
+│   ├── webui_static/          #   控制台静态页面（原生 HTML/CSS/JS，无构建）
+│   ├── desktop.py             #   桌面控制台（Tkinter，标准库，补充入口）
+│   ├── packaging.py           #   日志/截图打包 zip（CLI/桌面/Web 共用）
 ├── assets/
 │   ├── interface.json         # ProjectInterface v2（接口示例，见下方说明）
 │   └── resource/
@@ -58,6 +62,7 @@ maa-campus-run/
 │       └── model/ocr/                 # PaddleOCR 中文模型（det.onnx / rec.onnx / keys.txt）
 ├── scripts/
 │   ├── 一键值守.cmd            # 一键入口（推荐）：自检 → 执行 → 结果摘要
+│   ├── 桌面控制台.cmd          # 双击打开桌面控制台（pythonw，无控制台窗口）
 │   ├── oneclick.ps1           # 一键入口编排逻辑（由入口脚本调用）
 │   ├── run-now.cmd            # 兼容旧入口：等价于「一键值守.cmd」
 │   ├── dryrun.cmd             # 双击：安全演练
@@ -242,6 +247,50 @@ RRULE:FREQ=DAILY;BYHOUR=6,9,12;BYMINUTE=30
 - API Key 仅从环境变量读取（默认 `DEEPSEEK_API_KEY` / `DEEPSEEK_ENDPOINT` / `DEEPSEEK_MODEL`），不写入仓库/日志；
 - 支持 `mock` provider 做离线验收，正常页面不会上传截图。
 
+## 桌面控制台（补充入口）
+
+除了 Web 控制台，还提供一个 Windows 原生 Tkinter 桌面窗口（同样只依赖 Python 标准库）：
+
+```powershell
+.venv\Scripts\python.exe run.py --desktop
+```
+
+也可双击 `scripts\桌面控制台.cmd`（使用 `pythonw`，不显示控制台窗口）。
+
+- 概览、执行、配置、日志四个页签；支持 dry / 真实执行 / window-once / AI 单轮、停止任务、配置校验+备份；
+- 所有执行仍通过现有 `run.py` 子进程完成；
+- 原有 CLI / config / oneclick / DSH / Web 控制台全部保留；详见 [docs/desktop.md](docs/desktop.md)。
+
+## Web 控制台（补充入口）
+
+在保留全部 CLI / 配置 / 脚本入口的前提下，新增一个本地 Web 控制台，用于状态查看、参数配置、触发执行、结果反馈和日志查看：
+
+```powershell
+.venv\Scripts\python.exe run.py --web            # 默认 http://127.0.0.1:8765/
+.venv\Scripts\python.exe run.py --web --web-port 8765 --web-no-browser
+```
+
+- 仅使用 Python 标准库 + 原生 HTML/CSS/JS，**不新增依赖、不需要 Node/构建**；
+- 默认只监听 `127.0.0.1`，仅本机使用；
+- 所有执行都通过现有 `run.py` 子进程完成，参数/退出码/日志格式与 CLI 一致；
+- 原有入口保持不变；详见 [docs/webui.md](docs/webui.md)。
+
+## 日志与截图打包
+
+可将 `logs/` 下的日志、证据截图和少量状态文件打成 zip，便于留存或排障：
+
+```powershell
+# 默认最近 7 天、含截图 → logs/exports/maa_campus_logs_<时间戳>.zip
+.venv\Scripts\python.exe run.py --pack-logs
+
+# 最近 2 天、不含截图
+.venv\Scripts\python.exe run.py --pack-logs --pack-days 2 --pack-no-shots
+```
+
+- 桌面控制台「日志」页和 Web 控制台「日志」页也提供“打包日志与截图”按钮；
+- 不包含 `config.json`/密钥；截图可能含个人信息，压缩包不加密，请谨慎外发；
+- 配置项 `pack_days`（默认 7）、`pack_include_shots`（默认 true）；详见 [docs/packaging.md](docs/packaging.md)。
+
 ## 多模拟器并行
 
 在 `config.json` 中配置 `instances`（≥2 项）后，`run.py --now` 会为每个实例启动**独立子进程**并行执行同一套流程；每个子进程有自己的 adb、MaaFw Tasker、日志与当日标记，互不影响。
@@ -365,7 +414,7 @@ python tools\prepare_run.py            # 启动跑步模拟并打开健行校园
 
 ## 文档
 
-- [文档索引](docs/README.md)：架构与执行流程、配置说明、退出码与失败处理、FAQ、故障排查
+- [文档索引](docs/README.md)：架构与执行流程、配置说明、Web 控制台、退出码与失败处理、FAQ、故障排查
 
 ## 反馈与免责声明
 

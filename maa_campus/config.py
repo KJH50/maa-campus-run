@@ -48,6 +48,8 @@ DEFAULTS: dict = {
     "skip_if_success_today": True,
     "log_dir": "logs",
     "log_retention_days": 14,
+    "pack_days": 7,
+    "pack_include_shots": True,
     "pre_click_texts": [],
     "campus": {"package": "", "activity": ""},
     "run": {"package": "", "activity": ""},

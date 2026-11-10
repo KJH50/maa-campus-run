@@ -10,3 +10,5 @@ logs/
 
 # 本机配置（含绝对路径）；使用 config.example.json 初始化
 config.json
+config.json.bak-*
+config.json.tmp

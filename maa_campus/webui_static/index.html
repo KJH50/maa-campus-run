@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>校园跑值守 · 控制台</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo">跑</div>
+      <div>
+        <h1>校园跑值守 <span>控制台</span></h1>
+        <p class="sub">Web 控制台是补充入口，CLI / config.json / 定时脚本保持原有用法</p>
+      </div>
+    </div>
+    <div class="top-actions">
+      <span id="connPill" class="pill pill-idle">连接中…</span>
+      <span id="version" class="muted"></span>
+      <button id="refreshBtn" class="btn ghost" type="button">刷新</button>
+    </div>
+  </header>
+
+  <div id="banner" class="banner hidden"></div>
+
+  <nav class="tabs" role="tablist">
+    <button class="tab active" data-tab="overview" type="button">概览</button>
+    <button class="tab" data-tab="run" type="button">执行</button>
+    <button class="tab" data-tab="config" type="button">配置</button>
+    <button class="tab" data-tab="logs" type="button">日志</button>
+  </nav>
+
+  <main>
+    <section id="tab-overview" class="panel active">
+      <div class="grid cards">
+        <article class="card">
+          <div class="card-head"><h2>运行状态</h2><span id="jobPill" class="pill pill-idle">空闲</span></div>
+          <dl class="kv">
+            <dt>任务</dt><dd id="jobTitle">—</dd>
+            <dt>开始时间</dt><dd id="jobStarted">—</dd>
+            <dt>结束时间</dt><dd id="jobEnded">—</dd>
+            <dt>退出码</dt><dd id="jobExit">—</dd>
+          </dl>
+          <div class="row">
+            <button id="gotoRunBtn" class="btn primary" type="button">去执行</button>
+            <button id="stopBtn" class="btn danger hidden" type="button">停止任务</button>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="card-head"><h2>配置摘要</h2></div>
+          <dl class="kv" id="configSummary"></dl>
+        </article>
+
+        <article class="card wide">
+          <div class="card-head"><h2>实例状态</h2></div>
+          <div id="instanceTable"></div>
+        </article>
+
+        <article class="card">
+          <div class="card-head"><h2>最近一次运行</h2></div>
+          <dl class="kv" id="latestRun"></dl>
+          <div id="latestErrors" class="errors"></div>
+        </article>
+      </div>
+    </section>
+
+    <section id="tab-run" class="panel">
+      <div class="card">
+        <div class="card-head"><h2>触发执行</h2></div>
+        <div class="form-grid">
+          <label>执行模式
+            <select id="modeSelect">
+              <option value="dry">安全演练（dry，不点击、不跑步）</option>
+              <option value="now">立即执行（真实跑步，需确认）</option>
+              <option value="window_once">单时间段执行（--window-once）</option>
+              <option value="ai_watch_once">AI 页面检查一轮（--ai-watch-once）</option>
+            </select>
+          </label>
+          <label>实例
+            <select id="instanceSelect"><option value="">全部实例（按配置）</option></select>
+          </label>
+          <label class="check"><input type="checkbox" id="forceCheck"> --force（忽略当日成功标记）</label>
+          <label class="check"><input type="checkbox" id="noRecordCheck"> --no-record（不写完成记录）</label>
+        </div>
+        <p class="hint">所有执行都通过现有 <code>run.py</code> 子进程完成；参数与 CLI 完全一致。真实执行前会弹窗确认。</p>
+        <div class="row">
+          <button id="runBtn" class="btn primary" type="button">开始执行</button>
+          <button id="stopRunBtn" class="btn danger hidden" type="button">停止当前任务</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>实时输出</h2>
+          <span id="outputMeta" class="muted"></span>
+        </div>
+        <pre id="jobOutput" class="terminal">（尚未启动任务；点击“开始执行”后，这里会实时显示 run.py 输出）</pre>
+      </div>
+    </section>
+
+    <section id="tab-config" class="panel">
+      <div class="card">
+        <div class="card-head">
+          <h2>参数配置</h2>
+          <span class="muted" id="configPath"></span>
+        </div>
+        <div id="configMsg" class="banner hidden"></div>
+        <div class="form-grid">
+          <label>目标距离（km）<input type="number" step="0.01" id="qTargetDistance"></label>
+          <label>最高跑步次数 max_runs（0=不限制）<input type="number" step="1" id="qMaxRuns"></label>
+          <label>开跑后首次检查（分钟）<input type="number" step="1" id="qCheckAfter"></label>
+          <label>总超时（分钟）<input type="number" step="1" id="qMaxRunMinutes"></label>
+          <label>adb_serial<input type="text" id="qAdbSerial"></label>
+          <label>MuMu 实例序号<input type="number" step="1" id="qMumuIndex"></label>
+          <label>双实例错峰启动（秒）<input type="number" step="1" id="qStagger"></label>
+          <label class="check"><input type="checkbox" id="qSkipIfSuccess"> 当日成功后跳过（skip_if_success_today）</label>
+          <label class="check"><input type="checkbox" id="qShutdownEmulator"> 跑完关闭模拟器</label>
+          <label class="check"><input type="checkbox" id="qCloseApps"> 跑完关闭 App</label>
+          <label class="check"><input type="checkbox" id="qRefreshWindow"> 启动后刷新窗口</label>
+        </div>
+        <label class="block-label">run_windows（JSON 数组；留空表示不使用多时间段）
+          <textarea id="qRunWindows" rows="3" spellcheck="false"></textarea>
+        </label>
+        <label class="block-label">instances（JSON 数组；留空表示单实例）
+          <textarea id="qInstances" rows="4" spellcheck="false"></textarea>
+        </label>
+        <div class="row">
+          <button id="saveQuickBtn" class="btn primary" type="button">保存常用参数</button>
+          <button id="reloadConfigBtn" class="btn ghost" type="button">重新载入配置</button>
+        </div>
+        <p class="hint">写入前会自动备份为 <code>config.json.bak-时间戳</code>；保存前使用现有 <code>validate_config</code> 校验，非法配置不会写入。</p>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>完整配置（JSON）</h2>
+          <span class="muted">高级编辑；与 config.json 完全一致</span>
+        </div>
+        <textarea id="rawConfig" class="raw" spellcheck="false"></textarea>
+        <div class="row">
+          <button id="saveRawBtn" class="btn primary" type="button">保存完整 JSON</button>
+          <button id="revertRawBtn" class="btn ghost" type="button">撤销未保存修改</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-logs" class="panel">
+      <div class="card">
+        <div class="card-head"><h2>日志查看</h2></div>
+        <div class="form-grid">
+          <label>日志文件<select id="logSelect"></select></label>
+          <label>显示行数
+            <select id="tailSelect">
+              <option value="100">100</option>
+              <option value="300" selected>300</option>
+              <option value="800">800</option>
+            </select>
+          </label>
+          <label class="check"><input type="checkbox" id="autoRefreshLog" checked> 运行中自动刷新</label>
+        </div>
+        <div class="row">
+          <button id="loadLogBtn" class="btn primary" type="button">加载</button>
+          <button id="exportBtn" class="btn" type="button">打包日志与截图</button>
+          <span id="exportResult" class="muted"></span>
+          <span id="logMeta" class="muted"></span>
+        </div>
+        <pre id="logOutput" class="terminal">（选择日志文件后加载）</pre>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <span>本控制台默认只监听 127.0.0.1；请勿在公网环境开放。</span>
+    <span>原有入口：<code>python run.py --help</code> / oneclick / DSH 定时任务 / config.json 均保持可用。</span>
+  </footer>
+
+  <dialog id="confirmDialog">
+    <form method="dialog">
+      <h3 id="confirmTitle">确认执行？</h3>
+      <p id="confirmText"></p>
+      <div class="dialog-actions">
+        <button value="cancel" class="btn ghost" type="submit">取消</button>
+        <button id="confirmOk" value="ok" class="btn primary" type="submit">确认</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast hidden"></div>
+  <script src="/app.js"></script>
+</body>
+</html>

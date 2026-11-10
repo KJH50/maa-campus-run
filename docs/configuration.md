@@ -37,6 +37,8 @@
 | `skip_if_success_today` | bool | 否 | 当天已成功跑过则跳过，避免重复提交（默认 true；CLI `--force` 可忽略） |
 | `log_dir` | string | 否 | 日志目录（默认 `logs`） |
 | `log_retention_days` | int | 否 | 截图/入口日志保留天数（默认 14，`<=0` 不清理） |
+| `pack_days` | int | 否 | 日志/截图打包默认天数（默认 `7`，`0` 表示全部） |
+| `pack_include_shots` | bool | 否 | 打包时是否包含 `shots/` 截图（默认 `true`） |
 | `alerts` | object | 否 | 失败告警：`enabled` / `type` / `webhook_url` / `on`；`webhook_url` 为空或推送失败时写本地 `logs/alerts_YYYYMMDD.log` |
 
 ## 示例（节选）

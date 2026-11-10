@@ -293,9 +293,29 @@ def main() -> int:
     parser.add_argument("--test-alert", action="store_true", help="发送一条测试告警后退出")
     parser.add_argument("--ai-watch", action="store_true", help="启动 AI 定时页面检查循环（实验特性）")
     parser.add_argument("--ai-watch-once", action="store_true", help="只执行一轮 AI 页面检查（验收/调试）")
+    parser.add_argument("--web", action="store_true", help="启动本地 Web 控制台（补充入口，不执行跑步）")
+    parser.add_argument("--web-host", default="127.0.0.1", help="Web 控制台监听地址（默认 127.0.0.1）")
+    parser.add_argument("--web-port", type=int, default=8765, help="Web 控制台端口（默认 8765）")
+    parser.add_argument("--web-no-browser", action="store_true", help="启动 Web 控制台时不自动打开浏览器")
+    parser.add_argument("--desktop", action="store_true", help="启动桌面控制台（补充入口，不执行跑步）")
+    parser.add_argument("--pack-logs", action="store_true",
+                        help="打包日志与截图到 logs/exports 下的 zip 后退出")
+    parser.add_argument("--pack-output", default=None, help="--pack-logs 的 zip 输出路径")
+    parser.add_argument("--pack-days", type=int, default=None,
+                        help="--pack-logs 只包含最近 N 天（0=全部；默认取 config.pack_days）")
+    parser.add_argument("--pack-no-shots", action="store_true", help="--pack-logs 不含截图")
     args = parser.parse_args()
     if args.window_once and (args.now or args.at):
         parser.error("--window-once 不能与 --now/--at 同时使用")
+    if (args.web or args.desktop or args.pack_logs) and any([
+            args.now, args.at, args.dry, args.probe, args.screenshot,
+            args.wait_finish, args.window_once, args.instance, args.no_record,
+            args.force, args.test_alert, args.ai_watch, args.ai_watch_once]):
+        parser.error("--web/--desktop/--pack-logs 不能与其他执行参数同时使用；请单独启动或打包")
+    if args.pack_logs and (args.web or args.desktop):
+        parser.error("--pack-logs 不能与 --web/--desktop 同时使用")
+    if args.web and args.desktop:
+        parser.error("--web 与 --desktop 只能选择一个")
 
     cfg = load_config(Path(args.config))
     instance_env = os.environ.get("MAA_CAMPUS_INSTANCE")
@@ -319,6 +339,17 @@ def main() -> int:
             print(f"--instance 参数错误：{e}", file=sys.stderr)
             return 1
 
+    if args.web:
+        from .webui import serve
+
+        return serve(Path(args.config), host=args.web_host, port=args.web_port,
+                     open_browser=not args.web_no_browser)
+
+    if args.desktop:
+        from .desktop import launch
+
+        return launch(Path(args.config))
+
     logger = setup_logger(BASE / cfg.get("log_dir", "logs"), cfg.get("instance_name"))
 
     try:
@@ -328,6 +359,19 @@ def main() -> int:
         return 1
 
     cleanup_old_logs(cfg, logger)
+
+    if args.pack_logs:
+        from .packaging import pack_logs
+
+        try:
+            result = pack_logs(cfg, logger, output=args.pack_output,
+                               days=args.pack_days, include_shots=not args.pack_no_shots)
+        except Exception as e:  # noqa: BLE001
+            logger.error("打包日志/截图失败：%s", e)
+            return 1
+        logger.info("压缩包：%s（%s 个文件，%.1f MB）", result["path"], result["files"],
+                    result["archive_bytes"] / 1048576)
+        return 0
 
     if args.test_alert:
         ok = send_alert(cfg, logger, "test", "校园跑值守：测试告警",

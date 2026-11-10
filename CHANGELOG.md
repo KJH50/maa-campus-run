@@ -8,6 +8,9 @@
 
 ### Added
 
+- 日志与截图打包：`run.py --pack-logs` 将 logs/ 下日志、证据截图、AI/Web 日志和少量状态文件打成 zip（默认最近 7 天，可 `--pack-days`/`--pack-no-shots`/`--pack-output`）；桌面/Web 控制台增加打包按钮；不包含 config/密钥，输出到 `logs/exports/`。
+- 桌面控制台（补充入口）：`run.py --desktop` 启动 Tkinter 原生窗口，支持概览/执行/配置/日志、dry/now/window-once/AI 单轮、停止任务、配置校验+备份；复用现有 `webui.App` 与 `run.py` 子进程，无新增依赖；CLI/Web/配置/脚本入口全部保留。
+- Web 控制台（补充入口）：`run.py --web` 启动本地控制台，支持状态/配置/实例查看、dry/now/window-once/AI 单轮触发、实时输出与停止、配置校验+自动备份、日志查看；使用 Python 标准库 + 原生前端，无新增依赖；原有 CLI/config/脚本入口全部保留。
 - 最高跑步次数：`max_runs` 从校园跑界面 OCR 读取「已跑 X 次」，达到上限后不开始跑步并记录 `logs/.max_runs_reached_<instance>.json`，后续触发可直接跳过；支持 `run_count_patterns` 自定义正则、`log_run_count` 记录次数。
 - 连续执行稳定性：新增实例级运行锁 `logs/.run_<instance>.lock`（冲突返回退出码 5、过期自动回收）、双实例错峰启动 `instance_start_stagger_seconds`（默认 20 秒）、`run_lock_stale_seconds`（默认 1800 秒）。
 - 同日去重：同一实例当天多次运行避免重复/相近结束距离（`finish_target_avoid_repeat` 默认开启、`finish_target_min_gap_km` 默认 `0.02` km），状态按实例保存在 `logs/.finish_targets_<instance>.json`；两台设备之间互不限制。

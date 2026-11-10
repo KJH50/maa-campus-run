@@ -51,6 +51,8 @@
     "skip_if_success_today": true,
     "log_dir": "logs",
     "log_retention_days": 14,
+    "pack_days": 7,
+    "pack_include_shots": true,
     "pre_click_texts": [],
     "campus": {
         "package": "yx.c520.xyz",
