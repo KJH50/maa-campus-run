@@ -39,6 +39,7 @@ DEFAULTS: dict = {
     "finish_target_min_gap_km": 0.02,
     "check_after_minutes": 12,
     "max_run_minutes": 20,
+    "campus_start_timeout_seconds": 90,
     "max_pace_minutes": 10.0,
     "min_pace_minutes": 3.0,
     "distance_regex": "^\\d+\\.\\d{2}$",

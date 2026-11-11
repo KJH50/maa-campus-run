@@ -25,6 +25,7 @@
 | `log_run_count` | bool | 否 | 未设置上限时也读取并记录已跑次数（默认 `false`，减少 OCR 开销） |
 | `min_pace_minutes` / `max_pace_minutes` | float | 否 | 允许的平均配速区间（默认 3~10 分/公里） |
 | `check_after_minutes` | int | 否 | 开跑后先等待多久再检查（默认 12 分钟） |
+| `campus_start_timeout_seconds` | int | 否 | 点校园跑「开始」后等待真正进入跑步态的上限（默认 `90` 秒；期间检测「加载中」并继续等待，空闲时最多重试点击 3 次） |
 | `max_run_minutes` | int | 否 | 跑步总时间上限（默认 20 分钟，超过强制结束） |
 | `max_wait_minutes` / `poll_seconds` | int | 否 | 轮询等待上限与 OCR 间隔（默认 120 分钟 / 8 秒） |
 | `distance_regex` | string | 否 | 距离数字 OCR 匹配正则（默认 `^\d+\.\d{2}$`） |

@@ -32,6 +32,41 @@ def _fail(cfg: dict, logger: logging.Logger, event: str, title: str, content: st
     return code
 
 
+# 校园跑页状态标记：点「开始」后 App 可能加载较久，需要区分「还在加载」与「真的没起来」
+CAMPUS_IDLE_MARKERS = ["^开始$", "^点击跑步$"]
+CAMPUS_RUNNING_MARKERS = ["点击结束跑步", "^结束$"]
+CAMPUS_LOADING_MARKERS = [
+    "加载中", "正在加载", "加载数据", "加载页面", "请稍候", "请稍后",
+    "正在同步", "同步中", "正在进入", "正在开始",
+]
+
+
+def _texts_match(texts: list[str], patterns: list[str]) -> bool:
+    for text in texts:
+        for pattern in patterns:
+            try:
+                if re.search(pattern, text or ""):
+                    return True
+            except re.error:
+                continue
+    return False
+
+
+def _campus_page_state(tasker) -> str:
+    """判断校园跑页当前状态：running（已在记录）/ loading（仍在加载）/ idle（待开始）/ unknown。
+
+    单次 OCR 文本扫描后本地分类，避免每个状态各投一次 OCR 任务。
+    """
+    texts = ocr_texts(tasker)
+    if _texts_match(texts, CAMPUS_RUNNING_MARKERS):
+        return "running"
+    if _texts_match(texts, CAMPUS_LOADING_MARKERS):
+        return "loading"
+    if _texts_match(texts, CAMPUS_IDLE_MARKERS):
+        return "idle"
+    return "unknown"
+
+
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 
@@ -316,7 +351,7 @@ def prepare_campus(tasker, controller, cfg: dict, logger: logging.Logger, campus
     controller.start_app(cfg["campus"]["activity"])
     time.sleep(2.0)
     _remember_run_count(tasker, cfg, logger)
-    start_markers = ["^开始$", "^点击跑步$", "点击结束跑步"]
+    start_markers = CAMPUS_IDLE_MARKERS + CAMPUS_RUNNING_MARKERS
     for attempt in range(1, 10):
         if ocr_probe(tasker, ["放弃这条本地记录", "放弃"]):
             logger.info("发现未正常结束的本地记录，点击「放弃」")
@@ -357,8 +392,13 @@ def prepare_campus(tasker, controller, cfg: dict, logger: logging.Logger, campus
     return False
 
 
-def verify_running(tasker, controller, cfg: dict, logger: logging.Logger) -> bool:
-    """开跑前置校验：确认两个 App 都真的进入跑步状态，才允许进入 12 分钟等待。"""
+def verify_running(tasker, controller, cfg: dict, logger: logging.Logger,
+                   campus_confirmed: bool = False) -> bool:
+    """开跑前置校验：确认两个 App 都真的进入跑步状态，才允许进入 12 分钟等待。
+
+    campus_confirmed=True 表示 start_campus_run 已经轮询确认校园跑进入记录状态，
+    此时不再重复检查校园跑，只校验 RunSimulation。
+    """
     run_pkg = cfg["run"]["package"]
     campus_pkg = cfg["campus"]["package"]
     run_ok = False
@@ -368,13 +408,22 @@ def verify_running(tasker, controller, cfg: dict, logger: logging.Logger) -> boo
             run_ok = True
             break
         time.sleep(1.5)
-    campus_ok = False
-    for _ in range(10):
+    campus_ok = bool(campus_confirmed)
+    if campus_confirmed:
+        # start_campus_run 已确认进入跑步态；这里做一次快速复核，避免两次检查之间页面被意外退回。
         controller.focus_package = campus_pkg
-        if ocr_probe(tasker, ["点击结束跑步", "^结束$"]):
-            campus_ok = True
-            break
-        time.sleep(1.5)
+        for _ in range(2):
+            if ocr_probe(tasker, CAMPUS_RUNNING_MARKERS):
+                campus_ok = True
+                break
+            time.sleep(1.0)
+    else:
+        for _ in range(10):
+            controller.focus_package = campus_pkg
+            if ocr_probe(tasker, CAMPUS_RUNNING_MARKERS):
+                campus_ok = True
+                break
+            time.sleep(1.5)
     save_shot(controller, "running_check", logger)
     if not run_ok:
         logger.error("开跑前置校验失败：RunSimulation 未显示「正在跑步」")
@@ -564,16 +613,54 @@ def start_run_simulation(tasker, controller, cfg: dict, logger: logging.Logger, 
 
 
 def start_campus_run(tasker, controller, cfg: dict, logger: logging.Logger, campus_pkg: str) -> bool:
-    """点健行校园的「开始 / 点击跑步」。"""
-    logger.info("点击健行校园的「开始」...")
+    """点健行校园的「开始 / 点击跑步」，并轮询等待真正进入跑步状态。
+
+    校园跑 App 点「开始」后可能加载较久（实测可达 20~30 秒，冷启动更慢），
+    因此不能只看固定毫秒级超时：
+    - 识别到「点击结束跑步 / 结束」→ 成功；
+    - 识别到「加载中 / 请稍候」等文字 → 记录日志并继续等待；
+    - 仍是「开始 / 点击跑步」→ 间隔重试点击（最多 3 次，避免狂点）；
+    - 超过 campus_start_timeout_seconds（默认 90 秒）仍未进入跑步态才判失败。
+    """
+    raw_timeout = cfg.get("campus_start_timeout_seconds", 90)
+    try:
+        timeout_s = int(raw_timeout if raw_timeout is not None else 90)
+    except (TypeError, ValueError):
+        timeout_s = 90
+    timeout_s = max(10, timeout_s)
+    logger.info("点击健行校园的「开始」...（最长等待 %s 秒，期间检查是否仍在加载）", timeout_s)
     controller.focus_package = campus_pkg
-    job = post_and_wait(tasker, "CampusBegin")
+    start_ts = time.time()
+    deadline = start_ts + timeout_s
+    clicks = 0
+    idle_streak = 0
+    last_wait_log = 0.0
+    while time.time() < deadline:
+        state = _campus_page_state(tasker)
+        if state == "running":
+            save_shot(controller, "campus_started", logger)
+            logger.info("健行校园已开始记录（启动耗时 %.1f 秒）", time.time() - start_ts)
+            return True
+        if state == "loading":
+            idle_streak = 0
+            if time.time() - last_wait_log >= 5:
+                logger.info("校园跑仍在加载中，继续等待 ...")
+                last_wait_log = time.time()
+        else:
+            if state == "unknown" and time.time() - last_wait_log >= 5:
+                logger.info("校园跑页面状态未知，继续等待/尝试点击 ...")
+                last_wait_log = time.time()
+            idle_streak = idle_streak + 1 if state == "idle" else 0
+            if clicks == 0 or (idle_streak >= 3 and clicks < 3):
+                ok = ocr_tap(tasker, CAMPUS_IDLE_MARKERS)
+                clicks += 1
+                idle_streak = 0
+                last_wait_log = time.time()
+                logger.info("点击「开始/点击跑步」（第 %s 次）：%s", clicks, "成功" if ok else "未找到")
+        time.sleep(2.0)
     save_shot(controller, "campus_started", logger)
-    if not job.succeeded:
-        logger.error("点击校园跑开始失败")
-        return False
-    logger.info("健行校园已开始记录")
-    return True
+    logger.error("等待 %s 秒后校园跑仍未进入跑步状态（可能仍在加载或页面异常）", timeout_s)
+    return False
 
 
 # ------------------------------------------------------------------ 主流程
@@ -680,7 +767,7 @@ def _run_flow_impl(cfg: dict, logger: logging.Logger, dry: bool, skip_start: boo
                          "未能点击校园跑页的「开始/点击跑步」。", 3)
 
         # 3.5) 开跑前置校验：两个 App 都确实进入跑步状态，才进入长等待
-        if not verify_running(tasker, controller, cfg, logger):
+        if not verify_running(tasker, controller, cfg, logger, campus_confirmed=True):
             cleanup_apps(tasker, controller, cfg, logger, "开跑前置校验失败")
             return _fail(cfg, logger, "start_failed", "校园跑值守：开跑前置校验失败",
                          "两个 App 未同时进入跑步状态，已停止，请检查 App 画面。", 3)

@@ -117,51 +117,6 @@
     "RunStartDone": {
         "action": "DoNothing"
     },
-    "CampusBegin": {
-        "next": [
-            "CheckAlreadyRunning"
-        ],
-        "timeout": 8000,
-        "on_error": [
-            "TapCampusStart"
-        ]
-    },
-    "CheckAlreadyRunning": {
-        "recognition": "OCR",
-        "expected": "点击结束跑步",
-        "action": "DoNothing",
-        "next": [
-            "CampusBeginDone"
-        ],
-        "on_error": [
-            "TapCampusStart"
-        ],
-        "timeout": 5000
-    },
-    "TapCampusStart": {
-        "recognition": "OCR",
-        "expected": [
-            "^开始$",
-            "^点击跑步$"
-        ],
-        "action": "Click",
-        "next": [
-            "CampusBegan"
-        ],
-        "timeout": 10000
-    },
-    "CampusBegan": {
-        "recognition": "OCR",
-        "expected": "点击结束跑步",
-        "action": "DoNothing",
-        "next": [
-            "CampusBeginDone"
-        ],
-        "timeout": 10000
-    },
-    "CampusBeginDone": {
-        "action": "DoNothing"
-    },
     "ReadStats": {
         "recognition": "OCR",
         "expected": ".+",

@@ -106,6 +106,7 @@ python -m venv .venv
 | `finish_target_avoid_repeat` / `finish_target_min_gap_km` | 同一设备当天多次运行避免重复/相近结束距离（默认开启，间隔 `0.02` km；两台设备间互不限制） |
 | `max_pace_minutes` / `min_pace_minutes` | 结束前要求的配速区间，默认 `3.0 ~ 10.0` 分/公里 |
 | `check_after_minutes` | 开始跑步后先等多久再检查距离（正常 2 km 约需 12 分钟），默认 `12` |
+| `campus_start_timeout_seconds` | 点校园跑「开始」后等待进入跑步态的上限（默认 `90` 秒；期间识别加载状态并最多重试 3 次） |
 | `max_run_minutes` | 跑步总时间上限，超过就强制结束（保证 20 分钟内结束），默认 `20` |
 | `distance_regex` | 距离数字的 OCR 匹配（默认 `^\d+\.\d{2}$`） |
 | `route_text` | 跑步软件的路线名，默认 `标准`（先检查，不是才切换） |
@@ -315,10 +316,11 @@ RRULE:FREQ=DAILY;BYHOUR=6,9,12;BYMINUTE=30
 |---|---|
 | `RunPrepare` | 打开跑步软件；检查路线是否「标准」，不是才切（路线模式 → 路线库 → 标准 → 返回）；停在准备跑步页 |
 | `RunStart` | 点跑步软件的「开始跑步」 |
-| `CampusBegin` | 点健行校园的「开始 / 点击跑步」（已开跑则跳过） |
 | `ReadStats` | OCR 读「总距离(公里)」「平均配速」「总时间」，Python 判断达标 |
 | `CampusRunFinish` | 点「结束」→ 等「确定结束本次跑步吗」→ 点「确定结束」（精确匹配按钮，避免点到说明文字）→ 等待结算/上传文字 |
 | `CampusRunStop` | 启动跑步软件点「全部停止」，然后关闭两个 App；成功后按 `shutdown_emulator` 关闭 MuMu 模拟器 |
+
+> `CampusBegin` 已移除：校园跑「开始」现由 `flow.start_campus_run` 的 OCR 轮询处理（含加载等待与重试）。
 
 > 健行校园的「准备」（放弃未结束记录 → 首页 → 继续征程）由 `flow.prepare_campus` 的 Python OCR 状态机实现，
 > pipeline 中仅保留其余原子节点，避免两套准备逻辑并存。

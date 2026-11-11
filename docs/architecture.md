@@ -23,7 +23,7 @@
 
 1. **连接模拟器**：`emulator.ensure_emulator`（失败时按 `mumu_manager` 自动拉起）→ `maa_tasks.build_tasker`；
 2. **准备**：`RunPrepare`（打开 RunSimulation 并确认「标准」路线）→ `prepare_campus`（Python OCR 状态机：放弃未结束记录 / 首页 / 继续征程）；
-3. **开始**：`RunStart`（RunSimulation 开始跑步）→ `CampusBegin`（健行校园开始记录）；
+3. **开始**：`RunStart`（RunSimulation 开始跑步）→ `start_campus_run`（Python 点击校园跑开始，轮询等待进入跑步态；pipeline 的 `CampusBegin` 已移除）；
 4. **前置校验**：`verify_running` 确认两个 App 均已进入跑步状态，否则清理现场并返回 3；
 5. **等待**：先等 `check_after_minutes`（默认 12 分钟）；期间在 2、4 分钟各抽读一次距离，连续为 0 则提前失败（退出码 2）；
 6. **轮询**：读取距离/配速/时间，满足 `距离 ≥ target_distance_km` 且配速在区间内即结束；`max_run_minutes` 到时强制结束（返回 2）；模拟器自行停止时按平台判定处理；

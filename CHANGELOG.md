@@ -28,6 +28,7 @@
 
 ### Changed
 
+- 整理校园跑启动逻辑：统一 `CAMPUS_*` 状态标记，`_campus_page_state` 改为单次 OCR 文本扫描分类；`start_campus_run` 增加加载状态识别、未知状态日志、`campus_start_timeout_seconds`（默认 90 秒，空值回退默认）与最多 3 次重试点击；`verify_running` 在启动轮询已确认校园跑状态时跳过重复检查；移除未使用的 `CampusBegin` pipeline 节点链并同步 README/架构文档。
 - 简化为个人项目：移除 `CONTRIBUTING.md`、`CODE_OF_CONDUCT.md`、`SECURITY.md` 及对应链接，不再维护贡献指南/行为准则/安全策略。
 - 重写 `DISCLAIMER.md`：明确用户使用本脚本（含误用、配置错误、操作不当、脚本缺陷等）所进行的一切操作与后果由用户自行承担，作者/维护者不承担任何责任。
 - 默认示例配置 `config.example.json` 的 `run_windows` 设为 06:30-07:30、12:00-13:00、09:00-10:00（运行时自动按时间排序：06:30-07:30 → 09:00-10:00 → 12:00-13:00）。
