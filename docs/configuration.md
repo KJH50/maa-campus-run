@@ -32,7 +32,8 @@
 | `distance_regex` | string | 否 | 距离数字 OCR 匹配正则（默认 `^\d+\.\d{2}$`） |
 | `route_text` | string | 否 | RunSimulation 路线名（默认「标准」） |
 | `pre_click_texts` | string[] | 否 | 开始前的可选点击文字（找不到自动跳过） |
-| `campus` | object | ✅ | 健行校园：`package` / `activity`；`campus.login` 可配置自动登录 |
+| `campus` | object | ✅ | 健行校园：`package` / `activity` / `school`；`campus.login` 可配置自动登录 |
+| `campus.school` | string | 否 | 登录页目标学校（如「湖南高速铁路职业技术学院」）；退出登录/换设备后 App 学校被重置时，登录前自动切换回该学校 |
 | `campus.login.enabled` / `username` / `password` | bool/string | 否 | 登录页自动登录开关与学校统一身份认证账号；建议用环境变量 `MAA_CAMPUS_USERNAME` / `MAA_CAMPUS_PASSWORD` 覆盖，不要提交到仓库。多实例可额外使用 `MAA_CAMPUS_USERNAME_<实例名>` / `MAA_CAMPUS_PASSWORD_<实例名>`（实例名大写、非字母数字转下划线，如 `MAA_CAMPUS_USERNAME_MUMU_1`） |
 | `campus.login.remember_week` | bool | 否 | 自动登录时是否勾选「一周内免登录」（默认 `false`） |
 | `run` | object | ✅ | RunSimulation：`package` / `activity` |

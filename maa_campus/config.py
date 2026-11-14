@@ -55,6 +55,7 @@ DEFAULTS: dict = {
     "campus": {
         "package": "",
         "activity": "",
+        "school": "",
         "login": {
             "enabled": True,
             "username": "",

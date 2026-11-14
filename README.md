@@ -59,7 +59,7 @@
 > `--dry` 是安全演练（只截图 + 识别距离/配速，不点任何按钮）；
 > `--wait-finish` 用于「已经手动开跑」时只等待达标并结束（不点开始）。
 
-> 健行校园登录：流程开始时会先检测登录状态，未登录则自动用 `campus.login`（或环境变量）登录；多模拟器可为每个实例配置独立账号。自动登录失败会保存 `campus_login_required` 截图并以退出码 3 结束，不会继续点击开始。
+> 健行校园登录：流程开始时会先检测登录状态，未登录则自动用 `campus.login`（或环境变量）登录；多模拟器可为每个实例配置独立账号。若退出登录/换设备后 App 学校被重置（如显示「怀化学院」），会按 `campus.school` 自动切回目标学校再登录。自动登录失败会保存 `campus_login_required` 截图并以退出码 3 结束，不会继续点击开始。
 >
 > 需要换账号时：先运行 `run.py --logout --instance <name>` 退出登录，再正常执行即可用该实例配置的账号登录。
 
@@ -149,7 +149,7 @@ python -m venv .venv
 | `route_text` | 跑步软件的路线名，默认 `标准`（先检查，不是才切换） |
 | `pre_click_texts` | 进校园跑页后、开始前的可选点击（找不到自动跳过） |
 | `max_wait_minutes` / `poll_seconds` | 最长等待时间、OCR 轮询间隔 |
-| `campus` / `run` | 健行校园 / 跑步软件的包名与 Activity；`campus.login` 可配置统一身份认证自动登录（建议用环境变量存账号密码；多实例可用 `instances[].login` 或实例级环境变量） |
+| `campus` / `run` | 健行校园 / 跑步软件的包名与 Activity；`campus.school` 为登录页目标学校（自动切回）；`campus.login` 可配置统一身份认证自动登录（建议用环境变量存账号密码；多实例可用 `instances[].login` 或实例级环境变量） |
 | `close_apps` | 结束后是否停止模拟并关闭应用 |
 | `shutdown_emulator` | 成功跑完并关闭 App 后是否同时关闭 MuMu 模拟器，默认 `true`（下次运行会自动重新拉起） |
 | `skip_if_success_today` | 当天已成功跑过则跳过，避免重复提交，默认 `true`（`--force` 可忽略） |

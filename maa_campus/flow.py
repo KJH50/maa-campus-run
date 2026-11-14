@@ -131,6 +131,68 @@ def _campus_logged_in(tasker) -> bool:
     return _texts_match(ocr_texts(tasker), CAMPUS_LOGGED_IN_MARKERS)
 
 
+def _school_selector_text(items) -> str | None:
+    """登录页顶部的学校选择器文字（当前学校名，可能带「>」）。"""
+    for item in items:
+        text = (item.text or "").strip()
+        box = getattr(item, "box", None)
+        if not text or not box or len(box) < 2:
+            continue
+        if "选择学校" in text or "请选择" in text:
+            continue
+        name = text.rstrip(">").strip()
+        if not re.search(r"(学院|大学)$", name):
+            continue
+        if int(box[1]) > 160:  # 模型坐标 720x1280 的顶部区域
+            continue
+        return text
+    return None
+
+
+def _switch_campus_school(tasker, controller, cfg: dict, logger: logging.Logger) -> bool:
+    """登录页切换学校：顶部学校名 → 选择学校 → 目标学校。
+
+    退出登录/换设备后 App 可能回到默认学校；campus.school 为空时不处理。
+    """
+    expected = str((cfg.get("campus") or {}).get("school") or "").strip()
+    if not expected:
+        return True
+    from .page_observer import scan_ocr
+
+    for attempt in range(1, 6):
+        try:
+            items = scan_ocr(tasker)
+        except Exception as e:  # noqa: BLE001
+            logger.warning("登录检测：扫描学校选择器失败（%s）", e)
+            return True
+        joined = "\n".join((o.text or "") for o in items)
+        if "选择学校" in joined or "请选择你要登录的学校" in joined:
+            if expected not in joined:
+                logger.error("登录检测：学校列表中没有「%s」，请检查 campus.school 配置", expected)
+                return False
+            logger.info("登录检测：选择学校「%s」", expected)
+            if not ocr_tap(tasker, [re.escape(expected)]):
+                logger.warning("登录检测：点击学校「%s」失败", expected)
+                return False
+            time.sleep(2.0)
+            continue
+        if expected in joined:
+            if attempt == 1:
+                logger.info("登录检测：学校已选择「%s」", expected)
+            return True
+        selector = _school_selector_text(items)
+        if not selector:
+            logger.warning("登录检测：未找到学校选择入口，按当前学校继续")
+            return True
+        logger.info("登录检测：当前学校不是「%s」，打开学校选择器（%s）", expected, selector)
+        if not ocr_tap(tasker, [re.escape(selector)]):
+            logger.warning("登录检测：点击学校选择器失败")
+            return False
+        time.sleep(2.0)
+    logger.error("登录检测：切换学校失败（未找到「%s」）", expected)
+    return False
+
+
 def _enter_auth_from_landing(tasker, controller, logger: logging.Logger) -> bool:
     """从「欢迎登录」引导页进入统一身份认证账号密码页。
 
@@ -289,6 +351,8 @@ def ensure_campus_login(tasker, controller, cfg: dict, logger: logging.Logger,
         logger.warning("登录检测：暂未识别到登录页或已登录页面，继续准备流程（准备阶段会再次检测）")
         return True
     logger.info("登录检测：健行校园未登录，进入自动登录流程 ...")
+    if not _switch_campus_school(tasker, controller, cfg, logger):
+        return _campus_login_failure(controller, cfg, logger)
     if not auto_login_campus(tasker, controller, cfg, logger):
         return _campus_login_failure(controller, cfg, logger)
     cfg["_campus_login_state"] = "ok"

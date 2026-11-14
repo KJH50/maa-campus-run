@@ -12,6 +12,7 @@
 - 统一身份认证自动登录：检测到健行校园登录页时，使用 `campus.login` 或环境变量 `MAA_CAMPUS_USERNAME` / `MAA_CAMPUS_PASSWORD` 自动填写用户名/密码并点击登录；支持「一周内免登录」选项；失败时保存 `campus_login_failed` 截图并以退出码 3 结束。
 - 多模拟器登录：`instances[].login` 支持为每台模拟器配置独立账号；实例级环境变量 `MAA_CAMPUS_USERNAME_<实例名>` / `MAA_CAMPUS_PASSWORD_<实例名>`（实例名大写、非字母数字转下划线）优先于全局环境变量；并行时每个子进程独立检测/登录互不影响。
 - 退出登录（`run.py --logout`）：打开健行校园 → 底部「我的」→「退出登录」→ 校验回到登录引导页；多实例时配合 `--instance` 指定模拟器；已未登录时直接成功（幂等）；退出码 0/1/3/5。
+- 登录页学校自动切换：新增 `campus.school`；退出登录/换设备后 App 学校被重置（例如回到「怀化学院」）时，自动点击顶部学校选择器切回目标学校再登录。
 - 准备阶段兜底检测：打开健行校园、进入校园跑页的过程中再次识别登录页/「重新登录」提示，避免中途掉登录导致误点开始。
 - 日志与截图打包：`run.py --pack-logs` 将 logs/ 下日志、证据截图、AI/Web 日志和少量状态文件打成 zip（默认最近 7 天，可 `--pack-days`/`--pack-no-shots`/`--pack-output`）；桌面/Web 控制台增加打包按钮；不包含 config/密钥，输出到 `logs/exports/`。
 - 桌面控制台（补充入口）：`run.py --desktop` 启动 Tkinter 原生窗口，支持概览/执行/配置/日志、dry/now/window-once/AI 单轮、停止任务、配置校验+备份；复用现有 `webui.App` 与 `run.py` 子进程，无新增依赖；CLI/Web/配置/脚本入口全部保留。

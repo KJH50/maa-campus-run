@@ -58,6 +58,7 @@
     "campus": {
         "package": "yx.c520.xyz",
         "activity": "yx.c520.xyz/.MainActivity",
+        "school": "",
         "login": {
             "enabled": true,
             "username": "",
