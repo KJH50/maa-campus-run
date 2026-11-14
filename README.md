@@ -60,6 +60,8 @@
 > `--wait-finish` 用于「已经手动开跑」时只等待达标并结束（不点开始）。
 
 > 健行校园登录：流程开始时会先检测登录状态，未登录则自动用 `campus.login`（或环境变量）登录；多模拟器可为每个实例配置独立账号。自动登录失败会保存 `campus_login_required` 截图并以退出码 3 结束，不会继续点击开始。
+>
+> 需要换账号时：先运行 `run.py --logout --instance <name>` 退出登录，再正常执行即可用该实例配置的账号登录。
 
 ## 目录结构
 
@@ -188,6 +190,9 @@ python -m venv .venv
 
 # 10) 无痕执行：不写当日成功标记 / 时间段完成状态（便于重复或分实例执行）
 .venv\Scripts\python run.py --window-once --instance mumu-1 --no-record
+
+# 11) 退出健行校园登录（我的 → 退出登录）；多实例时用 --instance 指定模拟器
+.venv\Scripts\python run.py --logout --instance mumu-1
 ```
 
 ### 一键执行（手动，推荐）

@@ -15,7 +15,7 @@ from .alerts import send_alert
 from .config import apply_instance, load_config, validate_config
 from .emulator import ensure_emulator, make_adb
 from .evidence import save_shot
-from .flow import run_flow
+from .flow import run_flow, run_logout
 from .maa_tasks import build_tasker
 from .schedule import all_windows, resolve_target
 from .tasks import post_and_wait
@@ -286,6 +286,8 @@ def main() -> int:
                         help="DSH 兼容：只处理当前（或下一个）时间段，区间内随机等待后执行一次即退出")
     parser.add_argument("--instance", default=None,
                         help="只运行指定实例（instances 中的 name 或 1-based 序号），其余实例不执行")
+    parser.add_argument("--logout", action="store_true",
+                        help="退出健行校园登录（我的 → 退出登录），不执行跑步；多实例时配合 --instance 指定")
     parser.add_argument("--no-record", action="store_true",
                         help="不写完成记录（当日成功标记与时间段完成状态都不写），便于重复或分实例执行")
     parser.add_argument("--force", action="store_true", help="忽略「当日已成功」标记，强制再执行一次（谨慎：可能重复提交）")
@@ -309,8 +311,14 @@ def main() -> int:
     if (args.web or args.desktop or args.pack_logs) and any([
             args.now, args.at, args.dry, args.probe, args.screenshot,
             args.wait_finish, args.window_once, args.instance, args.no_record,
-            args.force, args.test_alert, args.ai_watch, args.ai_watch_once]):
+            args.force, args.test_alert, args.ai_watch, args.ai_watch_once,
+            args.logout]):
         parser.error("--web/--desktop/--pack-logs 不能与其他执行参数同时使用；请单独启动或打包")
+    if args.logout and any([
+            args.now, args.at, args.dry, args.probe, args.screenshot,
+            args.wait_finish, args.window_once, args.no_record, args.force,
+            args.test_alert, args.ai_watch, args.ai_watch_once]):
+        parser.error("--logout 不能与其他执行参数同时使用（可配合 --instance 指定模拟器）")
     if args.pack_logs and (args.web or args.desktop):
         parser.error("--pack-logs 不能与 --web/--desktop 同时使用")
     if args.web and args.desktop:
@@ -335,6 +343,11 @@ def main() -> int:
             print(f"--instance 参数错误：{e}", file=sys.stderr)
             return 1
 
+    if args.logout and len(cfg.get("instances") or []) >= 2:
+        print("配置了多个实例，--logout 请用 --instance <name|序号> 指定要退出登录的模拟器",
+              file=sys.stderr)
+        return 1
+
     if args.web:
         from .webui import serve
 
@@ -357,6 +370,12 @@ def main() -> int:
     if cfg.pop("_instance_login_configured", False):
         logger.info("实例 %s：已配置独立登录账号，自动登录优先使用该账号",
                     cfg.get("instance_name") or "default")
+
+    if args.logout:
+        logger.info("===== 退出登录（%s）=====", cfg.get("instance_name") or "default")
+        code = run_logout(cfg, logger)
+        logger.info("===== 退出登录结束，退出码 %s =====", code)
+        return code
 
     cleanup_old_logs(cfg, logger)
 

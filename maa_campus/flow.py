@@ -53,6 +53,12 @@ CAMPUS_LOGIN_ERROR_MARKERS = [
     "用户名或密码错误", "账号或密码错误", "密码错误", "验证码错误",
     "账号不存在", "用户不存在", "账号已被锁定", "登录失败", "认证失败",
 ]
+# 退出登录：我的页底部按钮 → 回到「欢迎登录」引导页（实测无二次确认）
+CAMPUS_LOGOUT_MARKERS = ["退出登录", "退出账号", "退出帐号"]
+CAMPUS_LOGGED_OUT_MARKERS = [
+    "欢迎登录", "进入统一身份认证", "请先登录", "请登录",
+    "手机号登录", "学号登录", "账号登录", "登录/注册",
+]
 
 
 def _instance_env_suffix(cfg: dict) -> str:
@@ -120,21 +126,30 @@ def _click_agreement_checkbox(tasker, controller, logger: logging.Logger) -> boo
         return False
 
 
+def _campus_logged_in(tasker) -> bool:
+    """当前画面是否已经是健行校园的已登录页面。"""
+    return _texts_match(ocr_texts(tasker), CAMPUS_LOGGED_IN_MARKERS)
+
+
 def _enter_auth_from_landing(tasker, controller, logger: logging.Logger) -> bool:
-    """从「欢迎登录」引导页点击进入统一身份认证账号密码页。"""
+    """从「欢迎登录」引导页进入统一身份认证账号密码页。
+
+    若认证平台已有缓存会话，点击后可能直接完成登录、不再显示账号密码页；
+    此时同样返回 True，由 auto_login_campus 进一步判断是否已登录。
+    """
     texts = ocr_texts(tasker)
     if not any("进入统一身份认证" in t for t in texts):
         return False
-    post_and_wait(tasker, "TapText", {"TapText": {"expected": ["^进入统一身份认证$"]}})
-    time.sleep(2.0)
-    if _auth_form_visible(ocr_texts(tasker)):
-        return True
-    # 首次进入时协议可能未勾选，按钮不可用；勾选后再点一次
-    if _click_agreement_checkbox(tasker, controller, logger):
-        time.sleep(1.0)
+    for attempt in range(1, 3):
         post_and_wait(tasker, "TapText", {"TapText": {"expected": ["^进入统一身份认证$"]}})
-        time.sleep(3.0)
-    return _auth_form_visible(ocr_texts(tasker))
+        time.sleep(2.0 if attempt == 1 else 3.0)
+        texts = ocr_texts(tasker)
+        if _auth_form_visible(texts) or _texts_match(texts, CAMPUS_LOGGED_IN_MARKERS):
+            return True
+        # 首次进入时协议可能未勾选，按钮不可用；勾选后再点一次
+        if attempt == 1 and _click_agreement_checkbox(tasker, controller, logger):
+            time.sleep(1.0)
+    return False
 
 
 def auto_login_campus(tasker, controller, cfg: dict, logger: logging.Logger) -> bool:
@@ -159,6 +174,10 @@ def auto_login_campus(tasker, controller, cfg: dict, logger: logging.Logger) -> 
         if not _enter_auth_from_landing(tasker, controller, logger):
             logger.warning("自动登录失败：未进入账号密码页")
             return False
+        if _campus_logged_in(tasker):
+            save_shot(controller, "campus_logged_in", logger)
+            logger.info("健行校园已通过已有会话登录")
+            return True
         if not tap(["用户名"]):
             logger.warning("自动登录失败：未找到用户名输入框")
             return False
@@ -274,6 +293,52 @@ def ensure_campus_login(tasker, controller, cfg: dict, logger: logging.Logger,
         return _campus_login_failure(controller, cfg, logger)
     cfg["_campus_login_state"] = "ok"
     return True
+
+
+def logout_campus(tasker, controller, cfg: dict, logger: logging.Logger) -> bool:
+    """退出健行校园登录：打开 App → 底部「我的」→「退出登录」→ 确认回到登录页。
+
+    已是未登录状态时直接返回 True（可重复执行）。当前版本实测点击「退出登录」
+    后会直接回到登录引导页，无二次确认；这里仍保留一次确认弹窗的兜底。
+    """
+    controller.focus_package = cfg["campus"]["package"]
+    controller.start_app(cfg["campus"]["activity"])
+    time.sleep(2.0)
+    if _texts_match(ocr_texts(tasker), CAMPUS_LOGGED_OUT_MARKERS):
+        logger.info("退出登录：当前已是未登录状态，无需操作")
+        return True
+    for attempt in range(1, 9):
+        texts = ocr_texts(tasker)
+        if _texts_match(texts, CAMPUS_LOGGED_OUT_MARKERS):
+            save_shot(controller, "campus_logged_out", logger)
+            logger.info("退出登录：完成（已回到登录页）")
+            return True
+        if _texts_match(texts, CAMPUS_LOGOUT_MARKERS):
+            logger.info("退出登录：点击「退出登录」（第 %s 次）", attempt)
+            ocr_tap(tasker, ["退出登录"])
+            time.sleep(2.0)
+            # 兼容可能出现的二次确认弹窗（实测当前版本没有）
+            if _texts_match(ocr_texts(tasker), ["^确定$", "^确认$", "确定退出"]):
+                logger.info("退出登录：点击二次确认")
+                ocr_tap(tasker, ["^确定$", "^确认$", "确定退出"])
+                time.sleep(2.0)
+            continue
+        if _texts_match(texts, ["^我的$"]):
+            logger.info("退出登录：点击底部「我的」（第 %s 次）", attempt)
+            ocr_tap(tasker, ["^我的$"])
+            time.sleep(2.0)
+            continue
+        if attempt in (3, 6):
+            logger.info("退出登录：未找到入口，重新打开健行校园（第 %s 次）", attempt)
+            controller.start_app(cfg["campus"]["activity"])
+            time.sleep(2.0)
+            continue
+        logger.info("退出登录：未找到「我的/退出登录」，按返回键（第 %s 次）", attempt)
+        controller.click_key(4)
+        time.sleep(1.5)
+    logger.error("退出登录失败：未能回到登录页（页面结构可能已变化，请检查截图）")
+    save_shot(controller, "campus_logout_failed", logger)
+    return False
 
 
 def _campus_page_state(tasker) -> str:
@@ -892,6 +957,28 @@ def start_campus_run(tasker, controller, cfg: dict, logger: logging.Logger, camp
 
 
 # ------------------------------------------------------------------ 主流程
+def run_logout(cfg: dict, logger: logging.Logger) -> int:
+    """独立退出登录入口：实例锁 → 连接模拟器 → 我的 → 退出登录。
+
+    退出码：0 成功（含本来未登录）；1 模拟器/控制器失败；3 退出登录失败；5 实例正在运行。
+    """
+    lock = _acquire_run_lock(cfg, logger)
+    if lock is None:
+        return 5
+    try:
+        adb = make_adb(cfg)
+        if not ensure_emulator(cfg, adb, logger):
+            logger.error("无法连接模拟器 %s", cfg["adb_serial"])
+            return 1
+        tasker, controller = build_tasker(cfg, adb, logger)
+        if tasker is None:
+            logger.error("MaaFramework 资源/控制器初始化失败，详见日志")
+            return 1
+        return 0 if logout_campus(tasker, controller, cfg, logger) else 3
+    finally:
+        _release_run_lock(lock, logger)
+
+
 def run_flow(cfg: dict, logger: logging.Logger, dry: bool, skip_start: bool = False,
              force: bool = False, record: bool = True) -> int:
     """完整流程入口：真实执行时先获取实例级运行锁，冲突返回退出码 5；dry 不占锁。"""

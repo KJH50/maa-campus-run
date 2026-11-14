@@ -42,3 +42,18 @@ def test_select_instance_without_instances():
     cfg = {"instances": []}
     with pytest.raises(ValueError, match="未配置 instances"):
         cli.apply_instance_selection(cfg, "mumu-1")
+
+
+def test_logout_requires_instance_for_multi(monkeypatch, capsys):
+    monkeypatch.setattr(cli, "load_config", lambda path: _cfg())
+    monkeypatch.delenv("MAA_CAMPUS_INSTANCE", raising=False)
+    monkeypatch.setattr(cli.sys, "argv", ["run.py", "--logout"])
+    assert cli.main() == 1
+    assert "--instance" in capsys.readouterr().err
+
+
+def test_logout_conflicts_with_now(monkeypatch):
+    monkeypatch.setattr(cli.sys, "argv", ["run.py", "--logout", "--now"])
+    with pytest.raises(SystemExit) as exc:
+        cli.main()
+    assert exc.value.code == 2

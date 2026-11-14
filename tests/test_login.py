@@ -104,6 +104,37 @@ def test_auto_login_handles_auth_portal(monkeypatch):
     assert "campus_logged_in" in saved
 
 
+def test_auto_login_uses_cached_session(monkeypatch):
+    """认证平台已有缓存会话时，点击引导页可能直接完成登录（不出现账号密码页）。"""
+    cfg = _cfg()
+    ctl = FakeController()
+    saved = []
+    texts = iter([["进入统一身份认证"], ["继续征程"], ["继续征程"]])
+
+    def post(tasker, entry, override=None):
+        patterns = str(((override or {}).get("TapText") or {}).get("expected") or [])
+        return FakeJob("用户名" not in patterns)
+
+    monkeypatch.setattr(flow, "post_and_wait", post)
+    monkeypatch.setattr(flow, "ocr_texts", lambda tasker: next(texts))
+    monkeypatch.setattr(flow, "save_shot",
+                        lambda controller, tag, logger: saved.append(tag) or None)
+    monkeypatch.setattr(flow.time, "sleep", lambda seconds: None)
+
+    assert flow.auto_login_campus(object(), ctl, cfg, logging.getLogger("t")) is True
+    assert ctl.inputs == []
+    assert "campus_logged_in" in saved
+
+
+def test_enter_auth_from_landing_detects_cached_login(monkeypatch):
+    texts = iter([["进入统一身份认证"], ["继续征程"]])
+    monkeypatch.setattr(flow, "post_and_wait", lambda *a, **k: FakeJob(True))
+    monkeypatch.setattr(flow, "ocr_texts", lambda tasker: next(texts))
+    monkeypatch.setattr(flow.time, "sleep", lambda seconds: None)
+    assert flow._enter_auth_from_landing(object(), FakeController(),
+                                         logging.getLogger("t")) is True
+
+
 def test_login_credentials_per_instance_env(monkeypatch):
     """多模拟器：实例级环境变量优先于全局环境变量与配置。"""
     monkeypatch.setenv("MAA_CAMPUS_USERNAME", "global-user")
