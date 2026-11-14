@@ -50,6 +50,7 @@ def test_prepare_campus_clicks_confirm_abandon(monkeypatch):
 
     monkeypatch.setattr(flow, "ocr_probe", probe)
     monkeypatch.setattr(flow, "ocr_tap", tap)
+    monkeypatch.setattr(flow, "ocr_texts", lambda tasker: ["总距离"])
     monkeypatch.setattr(flow, "save_shot", lambda *a, **k: None)
     monkeypatch.setattr(flow.time, "sleep", lambda s: None)
 
@@ -69,6 +70,7 @@ def test_prepare_campus_detects_login_required(monkeypatch):
         return any(("登录" in p) or p == "^登录$" for p in ps)
 
     monkeypatch.setattr(flow, "ocr_probe", probe)
+    monkeypatch.setattr(flow, "ocr_texts", lambda tasker: ["请先登录"])
     monkeypatch.setattr(flow, "save_shot",
                         lambda controller, tag, logger: shots.append(tag) or None)
     monkeypatch.setattr(flow.time, "sleep", lambda s: None)

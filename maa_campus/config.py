@@ -147,6 +147,25 @@ def _deep_merge(base: dict, override: dict) -> dict:
     return out
 
 
+def apply_instance(cfg: dict, inst: dict, index: int = 0) -> None:
+    """把 instances[index] 的覆盖项应用到当前 cfg。
+
+    除 adb / MuMu 序号 / 实例名外，若实例配置了 login，则覆盖全局
+    campus.login（多模拟器可为每台设备配置独立账号）。
+    """
+    cfg["adb_serial"] = inst.get("adb_serial") or cfg.get("adb_serial")
+    if inst.get("mumu_index") is not None:
+        cfg["mumu_index"] = int(inst["mumu_index"])
+    cfg["instance_name"] = str(inst.get("name") or f"instance{index + 1}")
+    login = inst.get("login")
+    if isinstance(login, dict) and login:
+        campus = cfg.setdefault("campus", {})
+        merged = dict(campus.get("login") or {})
+        merged.update(login)
+        campus["login"] = merged
+        cfg["_instance_login_configured"] = True
+
+
 def load_config(path: Path) -> dict:
     """读取 JSON 配置（允许 BOM），缺失项用默认值补齐（嵌套配置递归合并）。"""
     with open(path, "r", encoding="utf-8-sig") as f:
@@ -215,5 +234,14 @@ def validate_config(cfg: dict) -> None:
             if name in names:
                 raise ValueError(f"instances[{i}].name 重复：{name}")
             names.add(name)
+            login = inst.get("login")
+            if login is not None:
+                if not isinstance(login, dict):
+                    raise ValueError(f"instances[{i}].login 必须是对象")
+                if "enabled" in login and not isinstance(login["enabled"], bool):
+                    raise ValueError(f"instances[{i}].login.enabled 必须是布尔值")
+                for key in ("username", "password"):
+                    if login.get(key) is not None and not isinstance(login[key], str):
+                        raise ValueError(f"instances[{i}].login.{key} 必须是字符串")
     if missing:
         raise ValueError("缺少必填配置：" + "、".join(missing))

@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from .alerts import send_alert
-from .config import load_config, validate_config
+from .config import apply_instance, load_config, validate_config
 from .emulator import ensure_emulator, make_adb
 from .evidence import save_shot
 from .flow import run_flow
@@ -238,19 +238,18 @@ def apply_instance_selection(cfg: dict, selector: str) -> None:
     if not instances:
         raise ValueError("未配置 instances，无法使用 --instance")
     chosen = None
+    chosen_index = 0
     for i, inst in enumerate(instances, 1):
         name = str(inst.get("name") or f"instance{i}")
         if selector == str(i) or selector == name:
             chosen = inst
+            chosen_index = i - 1
             break
     if chosen is None:
         names = "、".join(f"{i}:{inst.get('name') or f'instance{i}'}"
                          for i, inst in enumerate(instances, 1))
         raise ValueError(f"找不到实例 {selector!r}（可用：{names}）")
-    cfg["adb_serial"] = chosen.get("adb_serial") or cfg.get("adb_serial")
-    if chosen.get("mumu_index") is not None:
-        cfg["mumu_index"] = int(chosen["mumu_index"])
-    cfg["instance_name"] = str(chosen.get("name") or "instance")
+    apply_instance(cfg, chosen, chosen_index)
     cfg["instances"] = []
 
 
@@ -327,10 +326,7 @@ def main() -> int:
         except (ValueError, IndexError):
             print(f"无效的 MAA_CAMPUS_INSTANCE：{instance_env}", file=sys.stderr)
             return 1
-        cfg["adb_serial"] = inst.get("adb_serial") or cfg["adb_serial"]
-        if inst.get("mumu_index") is not None:
-            cfg["mumu_index"] = int(inst["mumu_index"])
-        cfg["instance_name"] = str(inst.get("name") or f"instance{idx + 1}")
+        apply_instance(cfg, inst, idx)
 
     if args.instance:
         try:
@@ -357,6 +353,10 @@ def main() -> int:
     except ValueError as e:
         logger.error("配置校验失败：%s", e)
         return 1
+
+    if cfg.pop("_instance_login_configured", False):
+        logger.info("实例 %s：已配置独立登录账号，自动登录优先使用该账号",
+                    cfg.get("instance_name") or "default")
 
     cleanup_old_logs(cfg, logger)
 

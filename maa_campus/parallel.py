@@ -71,8 +71,9 @@ def run_parallel(cfg: dict, logger: logging.Logger, config_path: str | Path,
         env["MAA_CAMPUS_INSTANCE"] = str(i)
         env["MAA_CAMPUS_PARALLEL"] = "1"
         env["PYTHONIOENCODING"] = "utf-8"
-        logger.info("启动并行实例 %s：adb=%s，mumu_index=%s", name,
-                    inst.get("adb_serial"), inst.get("mumu_index"))
+        logger.info("启动并行实例 %s：adb=%s，mumu_index=%s%s", name,
+                    inst.get("adb_serial"), inst.get("mumu_index"),
+                    "，使用实例级登录账号" if inst.get("login") else "")
         delay = _stagger_delay(cfg, i)
         if delay > 0:
             logger.info("错峰启动：%.1f 秒后启动实例 %s（降低双实例同时冷启动/渲染的峰值）",
@@ -101,6 +102,9 @@ def run_parallel(cfg: dict, logger: logging.Logger, config_path: str | Path,
         code = p.wait()
         codes.append(code)
         logger.info("并行实例 %s 结束：退出码 %s", name, code)
+        if code == 3:
+            logger.warning("并行实例 %s 因登录/开始/结束失败退出（退出码 3），请检查该模拟器画面与登录状态",
+                           name)
     for t in threads:
         t.join(timeout=10)
 

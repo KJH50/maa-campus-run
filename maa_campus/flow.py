@@ -1,7 +1,8 @@
 """主流程：校园跑完整业务流程。
 
-顺序：准备 RunSimulation（标准路线）→ 准备健行校园（首页 → 继续征程）
-      → 点 RunSimulation 的「开始跑步」→ 点健行校园的「开始」→ 开跑前置校验
+顺序：登录检测（未登录先进入自动登录）→ 准备 RunSimulation（标准路线）
+      → 准备健行校园（首页 → 继续征程）→ 点 RunSimulation 的「开始跑步」
+      → 点健行校园的「开始」→ 开跑前置校验
       → 等待 + 轮询距离/配速 → 结束/结算 → 停止模拟并关闭 App → 关闭模拟器。
 基础设施（adb/MuMu 启停、MaaFw 初始化、OCR 原语）见 emulator.py / maa_tasks.py。
 """
@@ -44,6 +45,8 @@ CAMPUS_LOGIN_MARKERS = [
     "快捷登录", "登录/注册", "立即登录", "请先登录", "请登录", "未登录",
     "重新登录", "登录已过期", "登录账号", "请输入学号", "请输入手机号",
     "请输入密码", "获取验证码", "^登录$",
+    # 学校统一身份认证的引导页/中转页（还没有账号密码输入框）
+    "进入统一身份认证", "统一身份认证", "欢迎登录", "身份认证",
 ]
 CAMPUS_LOGGED_IN_MARKERS = ["继续征程", "我的征程", "总距离", "^首页$"]
 CAMPUS_LOGIN_ERROR_MARKERS = [
@@ -52,17 +55,31 @@ CAMPUS_LOGIN_ERROR_MARKERS = [
 ]
 
 
-def _campus_login_required(tasker) -> bool:
-    """检测健行校园是否停在登录页/未登录提示；登录页出现即视为不可继续。"""
-    return ocr_probe(tasker, CAMPUS_LOGIN_MARKERS)
+def _instance_env_suffix(cfg: dict) -> str:
+    """实例级环境变量后缀：mumu-1 → MUMU_1（无实例名时为空）。"""
+    name = str(cfg.get("instance_name") or "").strip()
+    if not name:
+        return ""
+    return re.sub(r"[^0-9A-Za-z]+", "_", name).strip("_").upper()
 
 
 def _campus_login_credentials(cfg: dict) -> tuple[bool, str, str, bool]:
-    """读取自动登录配置；环境变量优先于 config.json（避免把密码写进仓库）。"""
+    """读取自动登录配置；环境变量优先于 config.json（避免把密码写进仓库）。
+
+    多模拟器时支持实例级环境变量：MAA_CAMPUS_USERNAME_MUMU_1 /
+    MAA_CAMPUS_PASSWORD_MUMU_1（实例名大写、非字母数字转下划线），
+    其次才是全局 MAA_CAMPUS_USERNAME / MAA_CAMPUS_PASSWORD。
+    """
     login = ((cfg.get("campus") or {}).get("login") or {})
     enabled = bool(login.get("enabled", True))
-    username = os.environ.get("MAA_CAMPUS_USERNAME") or str(login.get("username") or "")
-    password = os.environ.get("MAA_CAMPUS_PASSWORD") or str(login.get("password") or "")
+    suffix = _instance_env_suffix(cfg)
+    username = ""
+    password = ""
+    if suffix:
+        username = os.environ.get(f"MAA_CAMPUS_USERNAME_{suffix}") or ""
+        password = os.environ.get(f"MAA_CAMPUS_PASSWORD_{suffix}") or ""
+    username = username or os.environ.get("MAA_CAMPUS_USERNAME") or str(login.get("username") or "")
+    password = password or os.environ.get("MAA_CAMPUS_PASSWORD") or str(login.get("password") or "")
     return enabled, username.strip(), password, bool(login.get("remember_week", False))
 
 
@@ -194,7 +211,7 @@ def auto_login_campus(tasker, controller, cfg: dict, logger: logging.Logger) -> 
 
 
 def _campus_login_failure(controller, cfg: dict, logger: logging.Logger) -> bool:
-    logger.error("检测到健行校园未登录（登录页/重新登录提示）；请先手动登录后再运行")
+    logger.error("检测到健行校园未登录；自动登录未完成，请先在模拟器中手动登录后再运行")
     save_shot(controller, "campus_login_required", logger)
     cfg["_campus_login_required"] = True
     return False
@@ -209,6 +226,54 @@ def _texts_match(texts: list[str], patterns: list[str]) -> bool:
             except re.error:
                 continue
     return False
+
+
+def _campus_login_state(tasker, timeout: float = 10.0) -> str:
+    """轮询识别健行校园登录状态：login / logged_in / unknown。
+
+    冷启动或 WebView 加载时首屏可能还没有文字，因此最多等待 timeout 秒；
+    登录页优先判断，避免首页加载慢时误判。多模拟器下每个实例各自检测。
+    """
+    attempts = max(1, int(max(1.0, float(timeout))))
+    for i in range(attempts):
+        texts = ocr_texts(tasker)
+        if _texts_match(texts, CAMPUS_LOGIN_MARKERS):
+            return "login"
+        if _texts_match(texts, CAMPUS_LOGGED_IN_MARKERS + CAMPUS_IDLE_MARKERS):
+            return "logged_in"
+        if i + 1 < attempts:
+            time.sleep(1.0)
+    return "unknown"
+
+
+def ensure_campus_login(tasker, controller, cfg: dict, logger: logging.Logger,
+                        start_app: bool = False, refresh: bool = False) -> bool:
+    """登录检测 + 登录流程：确认健行校园已登录，未登录则自动登录。
+
+    start_app=True 时先打开健行校园再检测（流程起点使用）；准备校园跑页时
+    App 已在前台，直接检测即可。refresh=True 强制重新检测（App 重启后使用），
+    否则复用本轮已确认的登录状态，避免重复 OCR。
+    返回 False 表示未登录且自动登录失败，调用方应以退出码 3 结束。
+    """
+    if not refresh and cfg.get("_campus_login_state") == "ok":
+        return True
+    if start_app:
+        controller.focus_package = cfg["campus"]["package"]
+        controller.start_app(cfg["campus"]["activity"])
+        time.sleep(2.0)
+    state = _campus_login_state(tasker)
+    if state == "logged_in":
+        logger.info("登录检测：健行校园已登录")
+        cfg["_campus_login_state"] = "ok"
+        return True
+    if state == "unknown":
+        logger.warning("登录检测：暂未识别到登录页或已登录页面，继续准备流程（准备阶段会再次检测）")
+        return True
+    logger.info("登录检测：健行校园未登录，进入自动登录流程 ...")
+    if not auto_login_campus(tasker, controller, cfg, logger):
+        return _campus_login_failure(controller, cfg, logger)
+    cfg["_campus_login_state"] = "ok"
+    return True
 
 
 def _campus_page_state(tasker) -> str:
@@ -510,9 +575,8 @@ def prepare_campus(tasker, controller, cfg: dict, logger: logging.Logger, campus
     controller.start_app(cfg["campus"]["activity"])
     time.sleep(2.0)
     _remember_run_count(tasker, cfg, logger)
-    if _campus_login_required(tasker):
-        if not auto_login_campus(tasker, controller, cfg, logger):
-            return _campus_login_failure(controller, cfg, logger)
+    if not ensure_campus_login(tasker, controller, cfg, logger, refresh=True):
+        return False
     start_markers = CAMPUS_IDLE_MARKERS + CAMPUS_RUNNING_MARKERS
     for attempt in range(1, 10):
         if ocr_probe(tasker, ["放弃这条本地记录", "放弃"]):
@@ -542,9 +606,8 @@ def prepare_campus(tasker, controller, cfg: dict, logger: logging.Logger, campus
             time.sleep(1.5)
             continue
         if attempt in (4, 7):
-            if _campus_login_required(tasker):
-                if not auto_login_campus(tasker, controller, cfg, logger):
-                    return _campus_login_failure(controller, cfg, logger)
+            if not ensure_campus_login(tasker, controller, cfg, logger, refresh=True):
+                return False
             logger.info("仍未到校园跑页，重新打开健行校园（第 %s 次）", attempt)
             controller.start_app(cfg["campus"]["activity"])
             time.sleep(2.0)
@@ -885,6 +948,11 @@ def _run_flow_impl(cfg: dict, logger: logging.Logger, dry: bool, skip_start: boo
     if skip_start:
         logger.info("跳过启动步骤（--wait-finish）：直接等待距离并结束")
     else:
+        # 0) 登录检测：先确认健行校园登录状态，未登录则进入自动登录流程
+        if not ensure_campus_login(tasker, controller, cfg, logger, start_app=True):
+            return _fail(cfg, logger, "start_failed", "校园跑值守：健行校园未登录",
+                         "检测到健行校园登录页，自动登录未成功；请手动登录后重试。", 3)
+
         # 1) 两个 App 都开到最终界面
         if not prepare_run_simulation(tasker, controller, cfg, logger, run_pkg):
             return _fail(cfg, logger, "start_failed", "校园跑值守：准备 RunSimulation 失败",
@@ -892,7 +960,7 @@ def _run_flow_impl(cfg: dict, logger: logging.Logger, dry: bool, skip_start: boo
         if not prepare_campus(tasker, controller, cfg, logger, campus_pkg):
             if cfg.pop("_campus_login_required", False):
                 return _fail(cfg, logger, "start_failed", "校园跑值守：健行校园未登录",
-                             "检测到登录页/未登录提示，请先在模拟器中手动登录健行校园后重试。", 3)
+                             "检测到登录页/未登录提示，自动登录未成功；请手动登录健行校园后重试。", 3)
             return _fail(cfg, logger, "start_failed", "校园跑值守：进入校园跑页失败",
                          "未能从首页点到「继续征程」，请检查 App 状态。", 3)
 

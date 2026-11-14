@@ -67,6 +67,7 @@ def patched(monkeypatch):
     monkeypatch.setattr(flow, "make_adb", lambda cfg: object())
     monkeypatch.setattr(flow, "ensure_emulator", lambda cfg, adb, logger: True)
     monkeypatch.setattr(flow, "build_tasker", lambda cfg, adb, logger: (object(), _Controller()))
+    monkeypatch.setattr(flow, "ensure_campus_login", lambda *a, **k: True)
     monkeypatch.setattr(flow, "prepare_run_simulation", lambda *a, **k: True)
     monkeypatch.setattr(flow, "prepare_campus", lambda *a, **k: True)
     monkeypatch.setattr(flow, "start_run_simulation", lambda *a, **k: True)

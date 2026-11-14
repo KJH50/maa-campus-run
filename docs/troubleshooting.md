@@ -34,12 +34,13 @@
 
 ## 登录页 / 未登录（退出码 3）
 
-- 现象：日志提示「健行校园未登录」或「自动登录失败」，并保存 `campus_login_required` / `campus_login_failed` 截图。
+- 现象：流程开始后日志提示「登录检测：健行校园未登录」或「自动登录失败」，并保存 `campus_login_required` / `campus_login_failed` 截图。
 - 处理：
   1. 确认 `campus.login.username/password` 或环境变量 `MAA_CAMPUS_USERNAME` / `MAA_CAMPUS_PASSWORD` 正确；
-  2. 若账号需要验证码/短信/首次改密，自动登录会失败，请手动在 MuMu 中完成登录；
-  3. 确认学校选择为「湖南高速铁路职业技术学院」；
-  4. 确认能看到首页或校园跑页后再运行。
+  2. 多模拟器使用不同账号时，确认对应实例的 `instances[].login` 或实例级环境变量（如 `MAA_CAMPUS_USERNAME_MUMU_2`）正确；
+  3. 若账号需要验证码/短信/首次改密，自动登录会失败，请手动在 MuMu 中完成登录；
+  4. 确认学校选择为「湖南高速铁路职业技术学院」；
+  5. 确认能看到首页或校园跑页后再运行。
 - 说明：脚本不会记录密码；`config.json` 已被 `.gitignore` 忽略，不要提交真实账号密码。
 
 ## 6. 收集信息提交 Issue

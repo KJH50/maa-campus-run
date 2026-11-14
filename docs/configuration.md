@@ -13,7 +13,8 @@
 | `emulator_boot_timeout_seconds` | int | 否 | 模拟器冷启动等待上限（秒，默认 `300`） |
 | `emulator_restart_on_fail` | bool | 否 | 启动超时后是否重启实例一次再重试（默认 `true`） |
 | `refresh_window_on_start` | bool | 否 | 连接/启动完成后自动显示并微调窗口尺寸以刷新渲染（修复画面错位，默认 `true`） |
-| `instances` | array | 否 | 多模拟器并行配置；≥2 项时自动并行（每项 `{name, adb_serial, mumu_index}`），为空则单实例 |
+| `instances` | array | 否 | 多模拟器并行配置；≥2 项时自动并行（每项 `{name, adb_serial, mumu_index}`，可选 `login` 为该实例单独配置登录账号），为空则单实例 |
+| `instances[].login` | object | 否 | 实例级登录账号：`{enabled, username, password, remember_week}`，未写的字段沿用全局 `campus.login`；多模拟器可为每台设备配置不同账号 |
 | `instance_start_stagger_seconds` | int | 否 | 双实例错峰启动间隔（秒，默认 `20`，0 表示同时启动） |
 | `run_lock_stale_seconds` | int | 否 | 实例运行锁过期时间（秒，默认 `1800`；异常退出后可自动回收） |
 | `start_time` | "HH:MM" | 否 | `run.py` 常驻等待/Windows 计划任务使用的执行时间（默认 `07:00`） |
@@ -32,7 +33,7 @@
 | `route_text` | string | 否 | RunSimulation 路线名（默认「标准」） |
 | `pre_click_texts` | string[] | 否 | 开始前的可选点击文字（找不到自动跳过） |
 | `campus` | object | ✅ | 健行校园：`package` / `activity`；`campus.login` 可配置自动登录 |
-| `campus.login.enabled` / `username` / `password` | bool/string | 否 | 登录页自动登录开关与学校统一身份认证账号；建议用环境变量 `MAA_CAMPUS_USERNAME` / `MAA_CAMPUS_PASSWORD` 覆盖，不要提交到仓库 |
+| `campus.login.enabled` / `username` / `password` | bool/string | 否 | 登录页自动登录开关与学校统一身份认证账号；建议用环境变量 `MAA_CAMPUS_USERNAME` / `MAA_CAMPUS_PASSWORD` 覆盖，不要提交到仓库。多实例可额外使用 `MAA_CAMPUS_USERNAME_<实例名>` / `MAA_CAMPUS_PASSWORD_<实例名>`（实例名大写、非字母数字转下划线，如 `MAA_CAMPUS_USERNAME_MUMU_1`） |
 | `campus.login.remember_week` | bool | 否 | 自动登录时是否勾选「一周内免登录」（默认 `false`） |
 | `run` | object | ✅ | RunSimulation：`package` / `activity` |
 | `close_apps` | bool | 否 | 结束后是否关闭两个 App（默认 true） |
@@ -106,12 +107,15 @@
 ```json
 "instances": [
   {"name": "mumu-1", "adb_serial": "127.0.0.1:16416", "mumu_index": 1},
-  {"name": "mumu-2", "adb_serial": "127.0.0.1:16448", "mumu_index": 2}
+  {"name": "mumu-2", "adb_serial": "127.0.0.1:16448", "mumu_index": 2,
+   "login": {"username": "账号2", "password": "密码2"}}
 ]
 ```
 
+- 流程开始时每个实例**独立检测登录状态**：未登录则进入自动登录，已登录直接继续；并行子进程之间互不影响；
+- 登录账号优先级：实例级环境变量 `MAA_CAMPUS_USERNAME_<实例名>` / `MAA_CAMPUS_PASSWORD_<实例名>` > 全局环境变量 `MAA_CAMPUS_USERNAME` / `MAA_CAMPUS_PASSWORD` > `instances[].login` > `campus.login`；
 - `adb_serial` 端口用 `MuMuManager.exe info -v <index>` 的 `adb_port` 确认；
-- 两个实例都需要安装并登录两个 App；
+- 两个实例都需要安装两个 App；未登录时脚本会自动登录（失败退出码 3）；
 - 并行时每个实例独立写日志 `logs/run_YYYYMMDD_<name>.log` 与当日标记 `.last_success_<name>`；
 - 退出码汇总规则见 README「多模拟器并行」；单实例配置保持不变。
 - 临时只跑其中一个实例：`--instance <name|1-based 序号>`（如 `--instance mumu-1`），其余实例不启动；可用于 `--now`、`--window-once` 及定时模式。
