@@ -57,7 +57,13 @@
     "pre_click_texts": [],
     "campus": {
         "package": "yx.c520.xyz",
-        "activity": "yx.c520.xyz/.MainActivity"
+        "activity": "yx.c520.xyz/.MainActivity",
+        "login": {
+            "enabled": true,
+            "username": "",
+            "password": "",
+            "remember_week": false
+        }
     },
     "run": {
         "package": "local.runsimulation.publicapp",

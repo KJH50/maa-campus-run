@@ -31,7 +31,9 @@
 | `distance_regex` | string | 否 | 距离数字 OCR 匹配正则（默认 `^\d+\.\d{2}$`） |
 | `route_text` | string | 否 | RunSimulation 路线名（默认「标准」） |
 | `pre_click_texts` | string[] | 否 | 开始前的可选点击文字（找不到自动跳过） |
-| `campus` | object | ✅ | 健行校园：`package` / `activity` |
+| `campus` | object | ✅ | 健行校园：`package` / `activity`；`campus.login` 可配置自动登录 |
+| `campus.login.enabled` / `username` / `password` | bool/string | 否 | 登录页自动登录开关与学校统一身份认证账号；建议用环境变量 `MAA_CAMPUS_USERNAME` / `MAA_CAMPUS_PASSWORD` 覆盖，不要提交到仓库 |
+| `campus.login.remember_week` | bool | 否 | 自动登录时是否勾选「一周内免登录」（默认 `false`） |
 | `run` | object | ✅ | RunSimulation：`package` / `activity` |
 | `close_apps` | bool | 否 | 结束后是否关闭两个 App（默认 true） |
 | `shutdown_emulator` | bool | 否 | 成功跑完后是否关闭 MuMu 模拟器（默认 true） |

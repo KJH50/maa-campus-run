@@ -39,6 +39,165 @@ CAMPUS_LOADING_MARKERS = [
     "加载中", "正在加载", "加载数据", "加载页面", "请稍候", "请稍后",
     "正在同步", "同步中", "正在进入", "正在开始",
 ]
+CAMPUS_LOGIN_MARKERS = [
+    "手机号登录", "学号登录", "账号登录", "密码登录", "验证码登录",
+    "快捷登录", "登录/注册", "立即登录", "请先登录", "请登录", "未登录",
+    "重新登录", "登录已过期", "登录账号", "请输入学号", "请输入手机号",
+    "请输入密码", "获取验证码", "^登录$",
+]
+CAMPUS_LOGGED_IN_MARKERS = ["继续征程", "我的征程", "总距离", "^首页$"]
+CAMPUS_LOGIN_ERROR_MARKERS = [
+    "用户名或密码错误", "账号或密码错误", "密码错误", "验证码错误",
+    "账号不存在", "用户不存在", "账号已被锁定", "登录失败", "认证失败",
+]
+
+
+def _campus_login_required(tasker) -> bool:
+    """检测健行校园是否停在登录页/未登录提示；登录页出现即视为不可继续。"""
+    return ocr_probe(tasker, CAMPUS_LOGIN_MARKERS)
+
+
+def _campus_login_credentials(cfg: dict) -> tuple[bool, str, str, bool]:
+    """读取自动登录配置；环境变量优先于 config.json（避免把密码写进仓库）。"""
+    login = ((cfg.get("campus") or {}).get("login") or {})
+    enabled = bool(login.get("enabled", True))
+    username = os.environ.get("MAA_CAMPUS_USERNAME") or str(login.get("username") or "")
+    password = os.environ.get("MAA_CAMPUS_PASSWORD") or str(login.get("password") or "")
+    return enabled, username.strip(), password, bool(login.get("remember_week", False))
+
+
+def _first_text_match(texts: list[str], patterns: list[str]) -> str | None:
+    for text in texts:
+        for pattern in patterns:
+            try:
+                if re.search(pattern, text or ""):
+                    return text
+            except re.error:
+                continue
+    return None
+
+
+def _auth_form_visible(texts: list[str]) -> bool:
+    return any("用户名" in t for t in texts)
+
+
+def _click_agreement_checkbox(tasker, controller, logger: logging.Logger) -> bool:
+    """登录引导页：协议勾选框没有文字，按 OCR 文本框左侧的固定偏移点击。"""
+    try:
+        from .page_observer import scan_ocr
+
+        items = scan_ocr(tasker)
+        target = next((o for o in items if "同意" in o.text and "隐私" in o.text), None)
+        if target is None or target.box is None:
+            return False
+        img = controller.screencap()
+        height, width = img.shape[:2]
+        sx, sy = width / 720.0, height / 1280.0  # Maa OCR 模型坐标空间为 720x1280
+        x = int((target.box[0] + target.box[2] / 2 - 113) * sx)
+        y = int((target.box[1] + target.box[3] / 2) * sy)
+        controller.click(x, y)
+        logger.info("自动登录：点击协议勾选框")
+        return True
+    except Exception as e:  # noqa: BLE001
+        logger.warning("自动登录：勾选协议失败（%s）", e)
+        return False
+
+
+def _enter_auth_from_landing(tasker, controller, logger: logging.Logger) -> bool:
+    """从「欢迎登录」引导页点击进入统一身份认证账号密码页。"""
+    texts = ocr_texts(tasker)
+    if not any("进入统一身份认证" in t for t in texts):
+        return False
+    post_and_wait(tasker, "TapText", {"TapText": {"expected": ["^进入统一身份认证$"]}})
+    time.sleep(2.0)
+    if _auth_form_visible(ocr_texts(tasker)):
+        return True
+    # 首次进入时协议可能未勾选，按钮不可用；勾选后再点一次
+    if _click_agreement_checkbox(tasker, controller, logger):
+        time.sleep(1.0)
+        post_and_wait(tasker, "TapText", {"TapText": {"expected": ["^进入统一身份认证$"]}})
+        time.sleep(3.0)
+    return _auth_form_visible(ocr_texts(tasker))
+
+
+def auto_login_campus(tasker, controller, cfg: dict, logger: logging.Logger) -> bool:
+    """在统一身份认证页用配置/环境变量自动登录；不输出密码。"""
+    enabled, username, password, remember = _campus_login_credentials(cfg)
+    if not enabled:
+        logger.warning("检测到健行校园登录页，但 campus.login.enabled=false")
+        return False
+    if not username or not password:
+        logger.warning("检测到健行校园登录页，但未配置 campus.login.username/password "
+                       "（或 MAA_CAMPUS_USERNAME/MAA_CAMPUS_PASSWORD）")
+        return False
+    campus_pkg = cfg["campus"]["package"]
+    controller.focus_package = campus_pkg
+
+    def tap(patterns: list[str]) -> bool:
+        job = post_and_wait(tasker, "TapText", {"TapText": {"expected": patterns}})
+        return job.succeeded
+
+    logger.info("检测到登录页，尝试自动登录（用户名已配置，密码不记录）...")
+    if not tap(["用户名"]):
+        if not _enter_auth_from_landing(tasker, controller, logger):
+            logger.warning("自动登录失败：未进入账号密码页")
+            return False
+        if not tap(["用户名"]):
+            logger.warning("自动登录失败：未找到用户名输入框")
+            return False
+    controller.input_text(username)
+    time.sleep(0.5)
+    if not tap(["^密码$", "密码"]):
+        logger.warning("自动登录失败：未找到密码输入框")
+        return False
+    controller.input_text(password)
+    time.sleep(0.5)
+    if remember:
+        tap(["一周内免登录"])
+    if not tap(["^登录$"]):
+        logger.warning("自动登录失败：未找到登录按钮")
+        return False
+
+    deadline = time.time() + 25
+    portal_clicks = 0
+    retry_clicks = 0
+    while time.time() < deadline:
+        texts = ocr_texts(tasker)
+        error_text = _first_text_match(texts, CAMPUS_LOGIN_ERROR_MARKERS)
+        if error_text:
+            logger.error("自动登录失败：页面提示「%s」", error_text)
+            save_shot(controller, "campus_login_failed", logger)
+            return False
+        if _texts_match(texts, CAMPUS_LOGGED_IN_MARKERS):
+            save_shot(controller, "campus_logged_in", logger)
+            logger.info("健行校园自动登录成功")
+            return True
+        # 认证平台有时会先停在「健行校园后台管理系统 → 进入统一身份认证」中转页
+        if portal_clicks < 2 and any("进入统一身份认证" in t for t in texts):
+            post_and_wait(tasker, "TapText",
+                          {"TapText": {"expected": ["^进入统一身份认证$"]}})
+            portal_clicks += 1
+            logger.info("自动登录：点击认证中转页（第 %s 次）", portal_clicks)
+            time.sleep(2.0)
+            continue
+        # 偶发 WebView 加载失败，尝试重试一次
+        if retry_clicks < 1 and any(("网页未能加载" in t or "^重试$" in t) for t in texts):
+            post_and_wait(tasker, "TapText", {"TapText": {"expected": ["^重试$"]}})
+            retry_clicks += 1
+            logger.info("自动登录：认证页加载失败，点击重试")
+            time.sleep(2.0)
+            continue
+        time.sleep(1.5)
+    logger.error("自动登录超时：未回到健行校园首页")
+    save_shot(controller, "campus_login_failed", logger)
+    return False
+
+
+def _campus_login_failure(controller, cfg: dict, logger: logging.Logger) -> bool:
+    logger.error("检测到健行校园未登录（登录页/重新登录提示）；请先手动登录后再运行")
+    save_shot(controller, "campus_login_required", logger)
+    cfg["_campus_login_required"] = True
+    return False
 
 
 def _texts_match(texts: list[str], patterns: list[str]) -> bool:
@@ -351,6 +510,9 @@ def prepare_campus(tasker, controller, cfg: dict, logger: logging.Logger, campus
     controller.start_app(cfg["campus"]["activity"])
     time.sleep(2.0)
     _remember_run_count(tasker, cfg, logger)
+    if _campus_login_required(tasker):
+        if not auto_login_campus(tasker, controller, cfg, logger):
+            return _campus_login_failure(controller, cfg, logger)
     start_markers = CAMPUS_IDLE_MARKERS + CAMPUS_RUNNING_MARKERS
     for attempt in range(1, 10):
         if ocr_probe(tasker, ["放弃这条本地记录", "放弃"]):
@@ -380,6 +542,9 @@ def prepare_campus(tasker, controller, cfg: dict, logger: logging.Logger, campus
             time.sleep(1.5)
             continue
         if attempt in (4, 7):
+            if _campus_login_required(tasker):
+                if not auto_login_campus(tasker, controller, cfg, logger):
+                    return _campus_login_failure(controller, cfg, logger)
             logger.info("仍未到校园跑页，重新打开健行校园（第 %s 次）", attempt)
             controller.start_app(cfg["campus"]["activity"])
             time.sleep(2.0)
@@ -725,6 +890,9 @@ def _run_flow_impl(cfg: dict, logger: logging.Logger, dry: bool, skip_start: boo
             return _fail(cfg, logger, "start_failed", "校园跑值守：准备 RunSimulation 失败",
                          "未能打开 RunSimulation 或确认标准路线。", 3)
         if not prepare_campus(tasker, controller, cfg, logger, campus_pkg):
+            if cfg.pop("_campus_login_required", False):
+                return _fail(cfg, logger, "start_failed", "校园跑值守：健行校园未登录",
+                             "检测到登录页/未登录提示，请先在模拟器中手动登录健行校园后重试。", 3)
             return _fail(cfg, logger, "start_failed", "校园跑值守：进入校园跑页失败",
                          "未能从首页点到「继续征程」，请检查 App 状态。", 3)
 

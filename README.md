@@ -1,12 +1,44 @@
 # MaaCampusRun · 校园跑值守（MaaFramework 版，距离+配速触发）
 
-参考 [MaaEnd](https://github.com/MaaEnd/MaaEnd) 的工程结构，用 [MaaFramework](https://github.com/MaaXYZ/MaaFramework)
-（Python 绑定 `MaaFw`）实现校园跑自动值守。
-
-**MaaCampusRun** 是一个 Windows 本地自动化工具：在 MuMu 模拟器中配合跑步软件与「健行校园」完成校园跑流程，
-按距离/配速自动结束、结算，并支持每日定时执行（DSH / Windows 计划任务）。
+**MaaCampusRun** 是一个 Windows 本地自动化工具：在 MuMu 模拟器中配合跑步软件与「健行校园」完成校园跑流程，按距离/配速自动结束、结算，并支持每日定时执行（DSH / Windows 计划任务）。
 
 > 项目状态：`0.2.1` · **GPL-3.0**（OSI 开源，允许商业使用；衍生作品须按 GPL 兼容方式开源，见 [LICENSE](LICENSE) 与 [DISCLAIMER.md](DISCLAIMER.md)）
+
+## 项目用处
+
+- **解决问题**：自动完成「准备路线 → 打开校园跑 → 开始 → 监控距离/配速 → 结束结算 → 关闭应用」的重复操作。
+- **目标用户与场景**：需要多次完成校园跑记录的个人用户；适用于每天多次、多模拟器并行、固定或随机时间段的无人值守执行。
+- **主要功能**：随机结束距离、同日距离去重、最高次数限制、多实例并行、定时执行、失败告警、运行日志/截图、Web/桌面控制台、日志与截图打包。
+- **预期价值**：减少重复人工操作，统一执行流程，问题可追踪、可复盘。
+- **适用边界**：仅适用于 Windows + MuMu + 指定 App 与 OCR 文案的可控环境；不适用于跨平台、无模拟器或禁止自动化的场景。
+
+## 项目优点
+
+- **完整闭环**：不只点一次开始，覆盖准备、开跑、校验、等待、结束、清理全过程。
+- **容错较强**：模拟器启动轮询/重启、窗口刷新、运行锁、加载等待、点击重试、状态复核。
+- **入口丰富**：CLI、`config.json`、oneclick、计划任务、Web 控制台、桌面控制台并存，互不替代。
+- **可观测**：分阶段日志、截图证据、告警、结构化运行状态和日志打包。
+- **本地轻量**：Web/桌面控制台基于 Python 标准库，无 Node/WebView 依赖；核心流程有离线 pytest 覆盖。
+
+## 项目缺点与限制
+
+- **平台绑定**：依赖 Windows、MuMu 模拟器、adb 地址与多屏映射，迁移环境需重新配置。
+- **UI/OCR 敏感**：App 改版、按钮文案或页面结构变化可能导致识别失败，需要同步更新 pipeline/OCR 标记。
+- **验证成本**：离线测试以 mock 为主，真实效果仍需实际模拟器和 App 验证。
+- **流程假设固定**：路线、配速区间和两个 App 的联动方式按当前场景设计，换学校或换 App 需要重新适配。
+- **合规风险**：仅适合个人学习、测试或明确允许自动化的环境，使用前需确认学校/平台规定。
+
+## 项目架构
+
+| 层级 | 模块 | 职责 |
+|---|---|---|
+| 入口层 | `run.py`、`cli.py`、`webui.py`、`desktop.py` | 参数解析、执行入口、Web/桌面控制台 |
+| 编排层 | `flow.py`、`parallel.py`、`schedule.py`、`ai_watch.py` | 主业务流程、多实例并行、时间段调度、AI 页面值守 |
+| 设备与识别层 | `emulator.py`、`adb.py`、`controller.py`、`maa_tasks.py`、`distance.py` | MuMu 启停、adb 操作、MaaFramework OCR、距离/配速解析 |
+| 资源与配置层 | `config.py`、`assets/resource/pipeline/`、OCR 模型 | 配置加载校验、任务流水线、OCR 资源 |
+| 支撑层 | `evidence.py`、`alerts.py`、`packaging.py`、`tasks.py` | 截图证据、告警、日志打包、Maa 任务投递 |
+
+> 技术栈：Python 3.12 + `MaaFw==5.15.0` + adb；部署形态为 Windows 本地运行 + MuMu 模拟器，本地控制台不依赖额外前端构建。工程结构参考 [MaaEnd](https://github.com/MaaEnd/MaaEnd)。
 
 ## 正确流程（用户确认）
 
@@ -25,6 +57,8 @@
 > ⚠️ 完整流程会**真实开始并结束一次跑步，可能向服务器提交记录**。确认后再运行 `--now`；
 > `--dry` 是安全演练（只截图 + 识别距离/配速，不点任何按钮）；
 > `--wait-finish` 用于「已经手动开跑」时只等待达标并结束（不点开始）。
+
+> 运行前请确认两个 App 均已登录。脚本会检测健行校园的登录页/「重新登录」提示，发现未登录会提前以退出码 3 结束，不会继续点击开始。
 
 ## 目录结构
 
@@ -112,7 +146,7 @@ python -m venv .venv
 | `route_text` | 跑步软件的路线名，默认 `标准`（先检查，不是才切换） |
 | `pre_click_texts` | 进校园跑页后、开始前的可选点击（找不到自动跳过） |
 | `max_wait_minutes` / `poll_seconds` | 最长等待时间、OCR 轮询间隔 |
-| `campus` / `run` | 健行校园 / 跑步软件的包名与 Activity（必填） |
+| `campus` / `run` | 健行校园 / 跑步软件的包名与 Activity；`campus.login` 可配置统一身份认证自动登录（建议用环境变量存账号密码） |
 | `close_apps` | 结束后是否停止模拟并关闭应用 |
 | `shutdown_emulator` | 成功跑完并关闭 App 后是否同时关闭 MuMu 模拟器，默认 `true`（下次运行会自动重新拉起） |
 | `skip_if_success_today` | 当天已成功跑过则跳过，避免重复提交，默认 `true`（`--force` 可忽略） |

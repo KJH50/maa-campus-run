@@ -61,6 +61,26 @@ def test_prepare_campus_clicks_confirm_abandon(monkeypatch):
     assert any("确认放弃" in patterns for patterns in taps)
 
 
+def test_prepare_campus_detects_login_required(monkeypatch):
+    shots = []
+
+    def probe(tasker, patterns):
+        ps = list(patterns)
+        return any(("登录" in p) or p == "^登录$" for p in ps)
+
+    monkeypatch.setattr(flow, "ocr_probe", probe)
+    monkeypatch.setattr(flow, "save_shot",
+                        lambda controller, tag, logger: shots.append(tag) or None)
+    monkeypatch.setattr(flow.time, "sleep", lambda s: None)
+
+    cfg = {"campus": {"activity": "c/.Main"}}
+    ctl = FakeController()
+    ok = flow.prepare_campus(object(), ctl, cfg, logging.getLogger("t"), "c")
+    assert ok is False
+    assert cfg["_campus_login_required"] is True
+    assert "campus_login_required" in shots
+
+
 def test_stop_finished_playback(monkeypatch):
     taps = []
     monkeypatch.setattr(flow, "ocr_probe",

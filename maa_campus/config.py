@@ -52,7 +52,16 @@ DEFAULTS: dict = {
     "pack_days": 7,
     "pack_include_shots": True,
     "pre_click_texts": [],
-    "campus": {"package": "", "activity": ""},
+    "campus": {
+        "package": "",
+        "activity": "",
+        "login": {
+            "enabled": True,
+            "username": "",
+            "password": "",
+            "remember_week": False,
+        },
+    },
     "run": {"package": "", "activity": ""},
     "alerts": {
         "enabled": False,
